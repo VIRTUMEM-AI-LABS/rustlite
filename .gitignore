@@ -1,0 +1,47 @@
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+
+# Cargo
+Cargo.lock
+**/*.orig
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+*.profraw
+*.profdata
+
+# Documentation
+/target/doc/
+
+# Benchmarks
+/target/criterion/
+
+# Environment
+.env
+.env.local
+
+# Database files (for testing)
+*.db
+*.db-shm
+*.db-wal
+*.rustlite
+
+# Logs
+*.log
+
+# Coverage
+tarpaulin-report.html
+cobertura.xml
+lcov.info
+
+# OS
+Thumbs.db

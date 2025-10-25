@@ -1,0 +1,15 @@
+# RustLite Code Owners
+   # Global ownership - all files require review from core maintainers
+   * @VIRTUMEM-AI-LABS/rustlite-core
+
+   # Specific areas
+   /src/                    @srikanth-aakuthota
+   /docs/                   @VIRTUMEM-AI-LABS/rustlite-docs
+   *.md                     @VIRTUMEM-AI-LABS/rustlite-docs
+   Cargo.toml              @srikanth-aakuthota
+   .github/                @srikanth-aakuthota
+
+   # Security-sensitive files
+   GOVERNANCE.md           @srikanth-aakuthota
+   LICENSE                 @srikanth-aakuthota
+   

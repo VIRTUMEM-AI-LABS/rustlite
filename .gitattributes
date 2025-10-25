@@ -1,0 +1,183 @@
+# Set default behavior to automatically normalize line endings
+* text=auto
+
+# Explicitly declare text files you want to normalize and convert to native line endings on checkout
+*.rs text
+*.toml text
+*.md text
+*.txt text
+*.json text
+*.yml text
+*.yaml text
+*.xml text
+*.html text
+*.css text
+*.js text
+*.ts text
+*.sql text
+
+# Declare files that will always have CRLF line endings on checkout
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Declare files that will always have LF line endings on checkout
+*.sh text eol=lf
+Makefile text eol=lf
+
+# Denote all files that are truly binary and should not be modified
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.mov binary
+*.mp4 binary
+*.mp3 binary
+*.flv binary
+*.fla binary
+*.swf binary
+*.gz binary
+*.zip binary
+*.7z binary
+*.ttf binary
+*.eot binary
+*.woff binary
+*.woff2 binary
+*.pyc binary
+*.pdf binary
+*.exe binary
+*.so binary
+*.dylib binary
+*.dll binary
+
+# Rust specific binaries
+target/ binary
+Cargo.lock binary
+
+# Database files (future use)
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+
+# Archives
+*.tar binary
+*.tar.gz binary
+*.tgz binary
+*.rar binary
+
+# Documents
+*.doc binary
+*.docx binary
+*.ppt binary
+*.pptx binary
+*.xls binary
+*.xlsx binary
+
+# Images
+*.svg text
+*.eps binary
+*.psd binary
+*.ai binary
+
+# Fonts
+*.otf binary
+*.otc binary
+*.ttc binary
+
+# Java (if any Java interop tools are used)
+*.jar binary
+*.class binary
+*.war binary
+*.ear binary
+
+# Backup files (treat as binary to avoid corruption)
+*.bak binary
+*.backup binary
+*.old binary
+
+# Log files (usually text but may contain binary data)
+*.log text
+
+# Configuration files (text)
+*.conf text
+*.config text
+*.ini text
+*.cfg text
+
+# Shell scripts
+*.sh text eol=lf
+*.bash text eol=lf
+*.zsh text eol=lf
+*.fish text eol=lf
+
+# Batch files
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# PowerShell
+*.ps1 text eol=crlf
+*.psm1 text eol=crlf
+*.psd1 text eol=crlf
+
+# Python files (if any Python tools are used)
+*.py text
+*.pyx text
+*.pyd binary
+*.pyo binary
+*.pyc binary
+
+# Ruby files (if any Ruby tools are used)
+*.rb text
+*.gemspec text
+Gemfile text
+Rakefile text
+
+# Go files (if any Go tools are used)
+*.go text
+
+# Docker files
+Dockerfile text
+*.dockerfile text
+docker-compose*.yml text
+
+# Kubernetes
+*.yaml text
+*.yml text
+
+# CI/CD
+.github/**/*.yml text
+.github/**/*.yaml text
+.gitlab-ci.yml text
+.travis.yml text
+appveyor.yml text
+azure-pipelines.yml text
+
+# README and documentation
+README* text
+CHANGELOG* text
+CONTRIBUTING* text
+LICENSE* text
+NOTICE* text
+AUTHORS* text
+CONTRIBUTORS* text
+COPYING* text
+INSTALL* text
+NEWS* text
+THANKS* text
+TODO* text
+USAGE* text
+GOVERNANCE* text
+ROADMAP* text
+ARCHITECTURE* text
+BRANDING* text
+
+# Git configuration
+.gitignore text
+.gitattributes text
+.gitmodules text
+
+# Editor configuration
+.editorconfig text
+.vscode/*.json text
+.vscode/*.md text
