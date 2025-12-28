@@ -1,27 +1,30 @@
-[package]
-name = "rustlite"
+[workspace]
+resolver = "2"
+members = [
+    "crates/rustlite-core",
+    "crates/rustlite-wal",
+    "crates/rustlite-storage",
+    "crates/rustlite-snapshot",
+    "crates/rustlite-api",
+]
+
+[workspace.package]
 version = "0.1.0"
 edition = "2021"
 authors = ["Srikanth Aakuthota <virtumemailabs@gmail.com>"]
-description = "A lightweight, high-performance embedded database written in Rust with ACID guarantees"
-readme = "README.md"
-repository = "https://github.com/VIRTUMEM-AI-LABS/rustlite"
 license = "Apache-2.0"
-keywords = ["database", "embedded", "storage", "key-value", "sql"]
-categories = ["database", "embedded", "data-structures"]
+repository = "https://github.com/VIRTUMEM-AI-LABS/rustlite"
+homepage = "https://rustlite.dev"
+documentation = "https://docs.rs/rustlite"
 rust-version = "1.70.0"
 
-[dependencies]
-# Core dependencies will be added as development progresses
-# Examples: tokio, serde, bincode, parking_lot, etc.
-
-[dev-dependencies]
-# Testing and benchmarking dependencies
+[workspace.dependencies]
+# Shared dependencies across workspace members
 criterion = "0.5"
-
-[lib]
-name = "rustlite"
-path = "src/lib.rs"
+crc32fast = "1.4"
+bincode = "1.3"
+serde = { version = "1.0", features = ["derive"] }
+tempfile = "3.14"
 
 [profile.release]
 opt-level = 3
@@ -31,7 +34,3 @@ strip = true
 
 [profile.bench]
 inherits = "release"
-
-[package.metadata.docs.rs]
-all-features = true
-rustdoc-args = ["--cfg", "docsrs"]

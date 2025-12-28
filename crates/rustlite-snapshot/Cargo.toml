@@ -1,0 +1,16 @@
+[package]
+name = "rustlite-snapshot"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Snapshot and backup functionality for RustLite"
+
+[dependencies]
+rustlite-core = { path = "../rustlite-core" }
+rustlite-storage = { path = "../rustlite-storage" }
+
+[dev-dependencies]
+criterion.workspace = true

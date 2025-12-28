@@ -1,0 +1,19 @@
+[package]
+name = "rustlite-wal"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Write-Ahead Log (WAL) implementation for RustLite"
+
+[dependencies]
+rustlite-core = { path = "../rustlite-core" }
+crc32fast.workspace = true
+bincode.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+tempfile.workspace = true

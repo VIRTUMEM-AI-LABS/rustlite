@@ -32,7 +32,7 @@ impl Transaction {
         // Lightweight placeholder: create an in-memory transaction object.
         Ok(Transaction { committed: false })
     }
-    
+
     /// Commit the transaction
     #[allow(dead_code)]
     pub fn commit(self) -> Result<()> {
@@ -40,7 +40,7 @@ impl Transaction {
         let _ = self;
         Ok(())
     }
-    
+
     /// Rollback the transaction
     #[allow(dead_code)]
     pub fn rollback(self) -> Result<()> {

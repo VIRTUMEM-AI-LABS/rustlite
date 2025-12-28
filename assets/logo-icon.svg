@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-labelledby="logoIconTitle">
+  <title id="logoIconTitle">RustLite icon — simple database with Rust theme</title>
+  <rect width="100%" height="100%" rx="18" fill="transparent" />
+
+  <defs>
+    <linearGradient id="rustGrad" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0%" stop-color="#E68A5A" />
+      <stop offset="50%" stop-color="#C96A2E" />
+      <stop offset="100%" stop-color="#A84510" />
+    </linearGradient>
+    <linearGradient id="topGrad" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#FFBB8A" stop-opacity="0.95" />
+      <stop offset="100%" stop-color="#E68A5A" stop-opacity="0.95" />
+    </linearGradient>
+  </defs>
+
+  <!-- Simple stacked database disks with integrated gear -->
+  <g transform="translate(64,64)">
+    <!-- Disk 1 (bottom - darkest) -->
+    <path d="M-28 8 L-28 22 A28 8 0 0 0 28 22 L28 8 A28 8 0 0 0 -28 8 Z" fill="#8a3f14" opacity="0.9" />
+    <ellipse cx="0" cy="22" rx="28" ry="8" fill="#6b2f12" opacity="0.95" />
+
+    <!-- Disk 2 (middle) -->
+    <path d="M-28 -2 L-28 12 A28 8 0 0 0 28 12 L28 -2 A28 8 0 0 0 -28 -2 Z" fill="url(#rustGrad)" opacity="0.95" />
+    <ellipse cx="0" cy="12" rx="28" ry="8" fill="#BF4F00" opacity="0.9" />
+
+    <!-- Disk 3 (top - brightest) -->
+    <path d="M-28 -12 L-28 2 A28 8 0 0 0 28 2 L28 -12 A28 8 0 0 0 -28 -12 Z" fill="url(#topGrad)" opacity="0.95" />
+    <ellipse cx="0" cy="2" rx="28" ry="8" fill="url(#topGrad)" opacity="0.95" />
+
+    <!-- Beautiful proper gear integrated in the center -->
+    <g transform="translate(0, 5)">
+      <!-- 12 proper gear teeth - compact and properly centered -->
+      <g fill="#C96A2E" opacity="0.92">
+        <!-- Tooth 1 (0°/top) -->
+        <polygon points="0,-17 2,-12 -2,-12" />
+        <!-- Tooth 2 (30°) -->
+        <polygon points="8.5,-14.7 10.5,-9.5 6.5,-11.5" />
+        <!-- Tooth 3 (60°) -->
+        <polygon points="14.7,-8.5 16.5,-2.5 12.5,-5.5" />
+        <!-- Tooth 4 (90°/right) -->
+        <polygon points="17,0 19,5 15,2" />
+        <!-- Tooth 5 (120°) -->
+        <polygon points="14.7,8.5 16.5,14.5 12.5,11.5" />
+        <!-- Tooth 6 (150°) -->
+        <polygon points="8.5,14.7 10.5,20 6.5,17" />
+        <!-- Tooth 7 (180°/bottom) -->
+        <polygon points="0,17 2,12 -2,12" />
+        <!-- Tooth 8 (210°) -->
+        <polygon points="-8.5,14.7 -10.5,20 -6.5,17" />
+        <!-- Tooth 9 (240°) -->
+        <polygon points="-14.7,8.5 -16.5,14.5 -12.5,11.5" />
+        <!-- Tooth 10 (270°/left) -->
+        <polygon points="-17,0 -19,5 -15,2" />
+        <!-- Tooth 11 (300°) -->
+        <polygon points="-14.7,-8.5 -16.5,-2.5 -12.5,-5.5" />
+        <!-- Tooth 12 (330°) -->
+        <polygon points="-8.5,-14.7 -10.5,-9.5 -6.5,-11.5" />
+      </g>
+
+      <!-- Gear body (main circle with smooth finish) -->
+      <circle cx="0" cy="0" r="12" fill="#E68A5A" opacity="0.8" />
+      <circle cx="0" cy="0" r="11.5" fill="#C96A2E" opacity="0.92" />
+      
+      <!-- Inner gear valley ring -->
+      <circle cx="0" cy="0" r="8.5" fill="none" stroke="#8a3f14" stroke-width="0.8" opacity="0.35" />
+      
+      <!-- Gear center hub (bold) -->
+      <circle cx="0" cy="0" r="6.5" fill="#FFBB8A" opacity="0.95" />
+      <circle cx="0" cy="0" r="4.5" fill="#E68A5A" opacity="0.92" />
+      
+      <!-- Center axle hole -->
+      <circle cx="0" cy="0" r="2.2" fill="#6b2f12" opacity="0.85" />
+    </g>
+
+    <!-- Top highlight -->
+    <ellipse cx="0" cy="-12" rx="12" ry="2.5" fill="#ffffff" opacity="0.15" />
+
+    <!-- Subtle shadow -->
+    <ellipse cx="4" cy="35" rx="32" ry="6" fill="#000000" opacity="0.08" />
+  </g>
+</svg>

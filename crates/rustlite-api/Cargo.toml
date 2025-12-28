@@ -1,0 +1,38 @@
+[package]
+name = "rustlite"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+rust-version.workspace = true
+description = "A lightweight, high-performance embedded database written in Rust with ACID guarantees"
+readme = "../../README.md"
+keywords = ["database", "embedded", "storage", "key-value", "sql"]
+categories = ["database", "embedded", "data-structures"]
+
+# Files to include in the published crate
+include = [
+    "../../README.md",
+    "../../CHANGELOG.md",
+    "../../CONTRIBUTING.md",
+    "../../LICENSE",
+    "../../assets/*",
+    "src/**",
+    "Cargo.toml",
+]
+
+[dependencies]
+rustlite-core = { path = "../rustlite-core", version = "0.1.0" }
+rustlite-wal = { path = "../rustlite-wal", version = "0.1.0" }
+rustlite-storage = { path = "../rustlite-storage", version = "0.1.0" }
+rustlite-snapshot = { path = "../rustlite-snapshot", version = "0.1.0" }
+
+[dev-dependencies]
+criterion.workspace = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

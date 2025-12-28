@@ -21,31 +21,43 @@ pub enum WalEntryType {
 /// Write-ahead log entry (placeholder)
 #[allow(dead_code)]
 pub struct WalEntry {
-    // Implementation details will be added in v0.2
+    /// Type of the WAL entry
+    pub entry_type: WalEntryType,
+    /// Optional key for put/delete operations
+    pub key: Option<Vec<u8>>,
+    /// Optional value for put operations
+    pub value: Option<Vec<u8>>,
+    /// Optional transaction id
+    pub tx_id: Option<u64>,
 }
 
 /// Write-ahead log (placeholder)
 #[allow(dead_code)]
 pub struct Wal {
-    // Implementation details will be added in v0.2
+    // In-memory log for placeholder behavior
+    entries: Vec<WalEntry>,
 }
 
 impl Wal {
     /// Create a new WAL instance
     #[allow(dead_code)]
     pub fn new(_path: &std::path::Path) -> Result<Self> {
-        unimplemented!("WAL will be implemented in v0.2")
+        // Placeholder: ignore path and keep an in-memory log
+        Ok(Wal { entries: Vec::new() })
     }
     
     /// Append an entry to the log
     #[allow(dead_code)]
     pub fn append(&mut self, _entry: WalEntry) -> Result<u64> {
-        unimplemented!("WAL will be implemented in v0.2")
+        // Append to in-memory vector and return its index as log offset
+        self.entries.push(_entry);
+        Ok((self.entries.len() - 1) as u64)
     }
     
     /// Sync the log to disk
     #[allow(dead_code)]
     pub fn sync(&mut self) -> Result<()> {
-        unimplemented!("WAL will be implemented in v0.2")
+        // No-op for placeholder in-memory WAL
+        Ok(())
     }
 }

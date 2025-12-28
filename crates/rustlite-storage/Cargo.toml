@@ -1,0 +1,16 @@
+[package]
+name = "rustlite-storage"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Storage engine (LSM, SSTable, compaction) for RustLite"
+
+[dependencies]
+rustlite-core = { path = "../rustlite-core" }
+rustlite-wal = { path = "../rustlite-wal" }
+
+[dev-dependencies]
+criterion.workspace = true

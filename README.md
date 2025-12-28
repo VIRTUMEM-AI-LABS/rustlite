@@ -1,9 +1,16 @@
 # RustLite
 
+
+<p align="right">
+    <img src="assets/logo-wordmark.svg" alt="RustLite logo" width="100" />
+</p>
+
 [![Crates.io](https://img.shields.io/crates/v/rustlite.svg)](https://crates.io/crates/rustlite)
 [![Documentation](https://docs.rs/rustlite/badge.svg)](https://docs.rs/rustlite)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 [![Build Status](https://github.com/VIRTUMEM-AI-LABS/rustlite/workflows/CI/badge.svg)](https://github.com/VIRTUMEM-AI-LABS/rustlite/actions)
+
+[![Changelog](https://img.shields.io/badge/Changelog-docs/CHANGELOG.md-blue.svg)](docs/CHANGELOG.md)
 
 **RustLite** is a lightweight, high-performance embedded database written entirely in Rust. Designed for applications that need a fast, reliable, and embeddable storage solution with ACID guarantees.
 
@@ -30,7 +37,7 @@ RustLite aims to be the go-to embedded database for Rust applications, combining
 - 🔄 **v0.5**: Full transaction support with MVCC
 - 🔄 **v1.0**: Production-ready with ACID guarantees
 
-See [ROADMAP.md](ROADMAP.md) for detailed plans.
+See [docs/ROADMAP.md](docs/ROADMAP.md) for detailed plans.
 
 ## 🚀 Quick Start
 
@@ -92,11 +99,11 @@ RustLite is built with a modular architecture:
 - **WAL**: Write-ahead logging for durability
 - **Index System**: Multiple index types for efficient queries
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for technical details.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for technical details and [docs/README.md](docs/README.md) for the full documentation index.
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+We welcome contributions! Please see our [CONTRIBUTING.md](docs/CONTRIBUTING.md) for guidelines.
 
 Key areas where we need help:
 - Core storage engine implementation

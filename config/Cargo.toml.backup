@@ -1,0 +1,52 @@
+[package]
+name = "rustlite"
+version = "0.1.0"
+edition = "2021"
+authors = ["Srikanth Aakuthota <virtumemailabs@gmail.com>"]
+description = "A lightweight, high-performance embedded database written in Rust with ACID guarantees"
+readme = "README.md"
+repository = "https://github.com/VIRTUMEM-AI-LABS/rustlite"
+license = "Apache-2.0"
+keywords = ["database", "embedded", "storage", "key-value", "sql"]
+categories = ["database", "embedded", "data-structures"]
+rust-version = "1.70.0"
+homepage = "https://rustlite.dev"
+documentation = "https://docs.rs/rustlite"
+
+# Files to include in the published crate. We explicitly include branding
+# assets (logo/icon) and key docs so crates.io renders the project page with
+# the intended logo and documentation.
+include = [
+	"README.md",
+	"CHANGELOG.md",
+	"CONTRIBUTING.md",
+	"LICENSE",
+	"assets/*",
+	"src/**",
+	"Cargo.toml",
+]
+
+[dependencies]
+# Core dependencies will be added as development progresses
+# Examples: tokio, serde, bincode, parking_lot, etc.
+
+[dev-dependencies]
+# Testing and benchmarking dependencies
+criterion = "0.5"
+
+[lib]
+name = "rustlite"
+path = "src/lib.rs"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+
+[profile.bench]
+inherits = "release"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

@@ -19,10 +19,10 @@ pub enum IndexType {
 pub trait Index {
     /// Insert a key into the index
     fn insert(&mut self, key: &[u8], value: u64) -> crate::Result<()>;
-    
+
     /// Find entries matching the key
     fn find(&self, key: &[u8]) -> crate::Result<Vec<u64>>;
-    
+
     /// Remove a key from the index
     fn remove(&mut self, key: &[u8]) -> crate::Result<bool>;
 }

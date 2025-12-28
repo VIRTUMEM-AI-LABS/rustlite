@@ -45,3 +45,19 @@ lcov.info
 
 # OS
 Thumbs.db
+/.vs
+
+# Social Media (Marketing)
+SOCIAL_MEDIA_HOOKS.md
+CHANGELOG.md
+
+# Marketing folder
+marketing/
+
+# Temporary files
+tmp/
+
+# Documentation
+docs/
+
+

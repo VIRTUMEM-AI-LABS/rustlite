@@ -11,19 +11,18 @@
 pub trait StorageEngine {
     /// Insert or update a key-value pair
     fn put(&mut self, key: &[u8], value: &[u8]) -> crate::Result<()>;
-    
+
     /// Retrieve a value by key
     fn get(&self, key: &[u8]) -> crate::Result<Option<Vec<u8>>>;
-    
+
     /// Delete a key-value pair
     fn delete(&mut self, key: &[u8]) -> crate::Result<bool>;
-    
+
     /// Flush pending writes to disk
     fn flush(&mut self) -> crate::Result<()>;
 }
 
 // Placeholder for future LSM-tree implementation
-#[allow(dead_code)]
 /// LSM-tree storage (placeholder)
 ///
 /// A log-structured merge-tree (LSM) based storage engine planned for v0.2.
@@ -35,7 +34,6 @@ pub struct LsmTree {
 }
 
 // Placeholder for future B-Tree implementation
-#[allow(dead_code)]
 /// B-Tree storage (placeholder)
 ///
 /// A B-Tree based storage backend planned for v0.3. B-Tree storage is useful
