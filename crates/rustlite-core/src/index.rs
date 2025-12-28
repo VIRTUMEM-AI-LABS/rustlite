@@ -1,25 +1,25 @@
 //! Indexing module for RustLite.
 //!
 //! This module provides B-Tree and Hash index implementations for efficient data retrieval.
-//! 
+//!
 //! ## Index Types
-//! 
+//!
 //! - **B-Tree Index**: Ordered index supporting range queries and prefix scans
 //! - **Hash Index**: Fast O(1) exact-match lookups
-//! 
+//!
 //! ## Example
-//! 
+//!
 //! ```rust
 //! use rustlite_core::index::{BTreeIndex, HashIndex, Index};
-//! 
+//!
 //! // B-Tree index for ordered access
 //! let mut btree = BTreeIndex::new();
 //! btree.insert(b"user:001", 100).unwrap();
 //! btree.insert(b"user:002", 200).unwrap();
-//! 
+//!
 //! // Range query
 //! let range = btree.range(b"user:001", b"user:999").unwrap();
-//! 
+//!
 //! // Hash index for fast lookups
 //! let mut hash = HashIndex::new();
 //! hash.insert(b"session:abc", 500).unwrap();
@@ -133,13 +133,16 @@ impl BTreeIndex {
     /// Returns a vector of (key, values) pairs in sorted order.
     pub fn range(&self, start: &[u8], end: &[u8]) -> crate::Result<Vec<(Vec<u8>, Vec<u64>)>> {
         use std::ops::Bound;
-        
+
         let results: Vec<_> = self
             .tree
-            .range((Bound::Included(start.to_vec()), Bound::Included(end.to_vec())))
+            .range((
+                Bound::Included(start.to_vec()),
+                Bound::Included(end.to_vec()),
+            ))
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect();
-        
+
         Ok(results)
     }
 
@@ -153,7 +156,7 @@ impl BTreeIndex {
             .take_while(|(k, _)| k.starts_with(prefix))
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect();
-        
+
         Ok(results)
     }
 
@@ -181,10 +184,7 @@ impl Default for BTreeIndex {
 
 impl Index for BTreeIndex {
     fn insert(&mut self, key: &[u8], value: u64) -> crate::Result<()> {
-        self.tree
-            .entry(key.to_vec())
-            .or_insert_with(Vec::new)
-            .push(value);
+        self.tree.entry(key.to_vec()).or_default().push(value);
         self.entry_count += 1;
         Ok(())
     }
@@ -298,10 +298,7 @@ impl Default for HashIndex {
 
 impl Index for HashIndex {
     fn insert(&mut self, key: &[u8], value: u64) -> crate::Result<()> {
-        self.map
-            .entry(key.to_vec())
-            .or_insert_with(Vec::new)
-            .push(value);
+        self.map.entry(key.to_vec()).or_default().push(value);
         self.entry_count += 1;
         Ok(())
     }
@@ -410,25 +407,19 @@ impl IndexManager {
 
     /// Insert a key-value pair into a named index.
     pub fn insert(&mut self, name: &str, key: &[u8], value: u64) -> crate::Result<()> {
-        let index = self.indexes.get_mut(name).ok_or_else(|| {
-            crate::Error::NotFound
-        })?;
+        let index = self.indexes.get_mut(name).ok_or(crate::Error::NotFound)?;
         index.insert(key, value)
     }
 
     /// Find values in a named index.
     pub fn find(&self, name: &str, key: &[u8]) -> crate::Result<Vec<u64>> {
-        let index = self.indexes.get(name).ok_or_else(|| {
-            crate::Error::NotFound
-        })?;
+        let index = self.indexes.get(name).ok_or(crate::Error::NotFound)?;
         index.find(key)
     }
 
     /// Remove a key from a named index.
     pub fn remove(&mut self, name: &str, key: &[u8]) -> crate::Result<bool> {
-        let index = self.indexes.get_mut(name).ok_or_else(|| {
-            crate::Error::NotFound
-        })?;
+        let index = self.indexes.get_mut(name).ok_or(crate::Error::NotFound)?;
         index.remove(key)
     }
 
@@ -478,20 +469,20 @@ mod tests {
     #[test]
     fn test_btree_index_basic_operations() {
         let mut index = BTreeIndex::new();
-        
+
         // Insert
         index.insert(b"key1", 100).unwrap();
         index.insert(b"key2", 200).unwrap();
         index.insert(b"key1", 101).unwrap(); // Duplicate key with different value
-        
+
         // Find
         assert_eq!(index.find(b"key1").unwrap(), vec![100, 101]);
         assert_eq!(index.find(b"key2").unwrap(), vec![200]);
         assert!(index.find(b"key3").unwrap().is_empty());
-        
+
         // Length
         assert_eq!(index.len(), 3);
-        
+
         // Remove
         assert!(index.remove(b"key1").unwrap());
         assert!(!index.remove(b"key1").unwrap());
@@ -501,13 +492,13 @@ mod tests {
     #[test]
     fn test_btree_index_range_query() {
         let mut index = BTreeIndex::new();
-        
+
         index.insert(b"a", 1).unwrap();
         index.insert(b"b", 2).unwrap();
         index.insert(b"c", 3).unwrap();
         index.insert(b"d", 4).unwrap();
         index.insert(b"e", 5).unwrap();
-        
+
         let range = index.range(b"b", b"d").unwrap();
         assert_eq!(range.len(), 3);
         assert_eq!(range[0].0, b"b");
@@ -518,16 +509,16 @@ mod tests {
     #[test]
     fn test_btree_index_prefix_scan() {
         let mut index = BTreeIndex::new();
-        
+
         index.insert(b"user:001", 1).unwrap();
         index.insert(b"user:002", 2).unwrap();
         index.insert(b"user:003", 3).unwrap();
         index.insert(b"order:001", 10).unwrap();
         index.insert(b"order:002", 20).unwrap();
-        
+
         let users = index.prefix_scan(b"user:").unwrap();
         assert_eq!(users.len(), 3);
-        
+
         let orders = index.prefix_scan(b"order:").unwrap();
         assert_eq!(orders.len(), 2);
     }
@@ -535,14 +526,14 @@ mod tests {
     #[test]
     fn test_btree_index_min_max() {
         let mut index = BTreeIndex::new();
-        
+
         assert!(index.min_key().is_none());
         assert!(index.max_key().is_none());
-        
+
         index.insert(b"middle", 2).unwrap();
         index.insert(b"first", 1).unwrap();
         index.insert(b"last", 3).unwrap();
-        
+
         assert_eq!(index.min_key(), Some(b"first".as_slice()));
         assert_eq!(index.max_key(), Some(b"middle".as_slice()));
     }
@@ -550,21 +541,21 @@ mod tests {
     #[test]
     fn test_hash_index_basic_operations() {
         let mut index = HashIndex::new();
-        
+
         // Insert
         index.insert(b"session:abc", 100).unwrap();
         index.insert(b"session:def", 200).unwrap();
         index.insert(b"session:abc", 101).unwrap();
-        
+
         // Find
         assert_eq!(index.find(b"session:abc").unwrap(), vec![100, 101]);
         assert_eq!(index.find(b"session:def").unwrap(), vec![200]);
         assert!(index.find(b"session:xyz").unwrap().is_empty());
-        
+
         // Contains
         assert!(index.contains_key(b"session:abc"));
         assert!(!index.contains_key(b"session:xyz"));
-        
+
         // Length
         assert_eq!(index.len(), 3);
         assert_eq!(index.key_count(), 2);
@@ -579,31 +570,31 @@ mod tests {
     #[test]
     fn test_index_manager() {
         let mut manager = IndexManager::new();
-        
+
         // Create indexes
         manager.create_index("users", IndexType::Hash).unwrap();
         manager.create_index("names", IndexType::BTree).unwrap();
-        
+
         // Duplicate name should fail
         assert!(manager.create_index("users", IndexType::Hash).is_err());
-        
+
         // Insert into indexes
         manager.insert("users", b"user:1", 100).unwrap();
         manager.insert("names", b"alice", 100).unwrap();
         manager.insert("names", b"bob", 101).unwrap();
-        
+
         // Find
         assert_eq!(manager.find("users", b"user:1").unwrap(), vec![100]);
         assert_eq!(manager.find("names", b"alice").unwrap(), vec![100]);
-        
+
         // List indexes
         let names = manager.list_indexes();
         assert_eq!(names.len(), 2);
-        
+
         // Index info
         let info = manager.index_info();
         assert_eq!(info.len(), 2);
-        
+
         // Drop index
         assert!(manager.drop_index("users").unwrap());
         assert!(!manager.drop_index("users").unwrap());
@@ -614,16 +605,16 @@ mod tests {
     fn test_index_clear() {
         let mut btree = BTreeIndex::new();
         let mut hash = HashIndex::new();
-        
+
         btree.insert(b"key", 1).unwrap();
         hash.insert(b"key", 1).unwrap();
-        
+
         assert!(!btree.is_empty());
         assert!(!hash.is_empty());
-        
+
         btree.clear();
         hash.clear();
-        
+
         assert!(btree.is_empty());
         assert!(hash.is_empty());
     }

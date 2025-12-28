@@ -14,7 +14,7 @@ struct User {
 #[derive(Debug, Serialize, Deserialize)]
 struct Order {
     id: u64,
-    user_id: u64,  // Foreign key to User
+    user_id: u64, // Foreign key to User
     product: String,
     amount: f64,
 }
@@ -29,13 +29,13 @@ fn main() -> Result<()> {
     // Setup: Create indexes for Users table
     // =========================================================================
     println!("Setting up Users table indexes...");
-    
+
     // Primary key index (Hash for O(1) lookup by user_id)
     db.create_index("users_pk", IndexType::Hash)?;
-    
+
     // Secondary index for email lookups
     db.create_index("users_by_email", IndexType::Hash)?;
-    
+
     // Secondary index for name lookups (BTree for range queries)
     db.create_index("users_by_name", IndexType::BTree)?;
 
@@ -43,20 +43,20 @@ fn main() -> Result<()> {
     // Setup: Create indexes for Orders table
     // =========================================================================
     println!("Setting up Orders table indexes...");
-    
+
     // Primary key index
     db.create_index("orders_pk", IndexType::Hash)?;
-    
+
     // Foreign key index (BTree to query all orders for a user)
     db.create_index("orders_by_user", IndexType::BTree)?;
-    
+
     println!("✓ Indexes created\n");
 
     // =========================================================================
     // Insert Users
     // =========================================================================
     println!("Inserting users...");
-    
+
     let users = vec![
         User {
             id: 1,
@@ -80,12 +80,12 @@ fn main() -> Result<()> {
         let key = format!("user:{}", user.id);
         let value = bincode::serialize(user).unwrap();
         db.put(key.as_bytes(), &value)?;
-        
+
         // Update indexes
         db.index_insert("users_pk", &user.id.to_le_bytes(), user.id)?;
         db.index_insert("users_by_email", user.email.as_bytes(), user.id)?;
         db.index_insert("users_by_name", user.name.as_bytes(), user.id)?;
-        
+
         println!("  ✓ Inserted user: {} (ID: {})", user.name, user.id);
     }
     println!();
@@ -94,7 +94,7 @@ fn main() -> Result<()> {
     // Insert Orders
     // =========================================================================
     println!("Inserting orders...");
-    
+
     let orders = vec![
         Order {
             id: 101,
@@ -130,23 +130,30 @@ fn main() -> Result<()> {
 
     for order in &orders {
         // Validate foreign key constraint
-        let user_exists = !db.index_find("users_pk", &order.user_id.to_le_bytes())?.is_empty();
+        let user_exists = !db
+            .index_find("users_pk", &order.user_id.to_le_bytes())?
+            .is_empty();
         if !user_exists {
-            eprintln!("ERROR: Invalid user_id {} for order {}", order.user_id, order.id);
+            eprintln!(
+                "ERROR: Invalid user_id {} for order {}",
+                order.user_id, order.id
+            );
             continue;
         }
-        
+
         // Store order data
         let key = format!("order:{}", order.id);
         let value = bincode::serialize(order).unwrap();
         db.put(key.as_bytes(), &value)?;
-        
+
         // Update indexes
         db.index_insert("orders_pk", &order.id.to_le_bytes(), order.id)?;
         db.index_insert("orders_by_user", &order.user_id.to_le_bytes(), order.id)?;
-        
-        println!("  ✓ Inserted order: {} for user {} (${:.2})", 
-                 order.product, order.user_id, order.amount);
+
+        println!(
+            "  ✓ Inserted order: {} for user {} (${:.2})",
+            order.product, order.user_id, order.amount
+        );
     }
     println!();
 
@@ -156,7 +163,7 @@ fn main() -> Result<()> {
     println!("=== Query 1: Find user by ID ===");
     let user_id: u64 = 2;
     let user_ids = db.index_find("users_pk", &user_id.to_le_bytes())?;
-    
+
     if let Some(&found_id) = user_ids.first() {
         let key = format!("user:{}", found_id);
         if let Some(data) = db.get(key.as_bytes())? {
@@ -172,7 +179,7 @@ fn main() -> Result<()> {
     println!("=== Query 2: Find user by email ===");
     let email = b"alice@example.com";
     let user_ids = db.index_find("users_by_email", email)?;
-    
+
     if let Some(&found_id) = user_ids.first() {
         let key = format!("user:{}", found_id);
         if let Some(data) = db.get(key.as_bytes())? {
@@ -187,7 +194,7 @@ fn main() -> Result<()> {
     // =========================================================================
     println!("=== Query 3: Get all orders for user 1 (Alice) ===");
     let user_id: u64 = 1;
-    
+
     // Get user info
     let user_ids = db.index_find("users_pk", &user_id.to_le_bytes())?;
     if let Some(&found_id) = user_ids.first() {
@@ -197,17 +204,20 @@ fn main() -> Result<()> {
             println!("User: {}", user.name);
         }
     }
-    
+
     // Get all orders for this user
     let order_ids = db.index_find("orders_by_user", &user_id.to_le_bytes())?;
     println!("Found {} orders:", order_ids.len());
-    
+
     let mut total = 0.0;
     for &order_id in &order_ids {
         let key = format!("order:{}", order_id);
         if let Some(data) = db.get(key.as_bytes())? {
             let order: Order = bincode::deserialize(&data).unwrap();
-            println!("  - Order #{}: {} (${:.2})", order.id, order.product, order.amount);
+            println!(
+                "  - Order #{}: {} (${:.2})",
+                order.id, order.product, order.amount
+            );
             total += order.amount;
         }
     }
@@ -233,7 +243,7 @@ fn main() -> Result<()> {
     for user in &users {
         let order_ids = db.index_find("orders_by_user", &user.id.to_le_bytes())?;
         let mut total = 0.0;
-        
+
         for &order_id in &order_ids {
             let key = format!("order:{}", order_id);
             if let Some(data) = db.get(key.as_bytes())? {
@@ -241,9 +251,13 @@ fn main() -> Result<()> {
                 total += order.amount;
             }
         }
-        
-        println!("{}: {} orders, ${:.2} total", 
-                 user.name, order_ids.len(), total);
+
+        println!(
+            "{}: {} orders, ${:.2} total",
+            user.name,
+            order_ids.len(),
+            total
+        );
     }
     println!();
 
@@ -252,11 +266,15 @@ fn main() -> Result<()> {
     // =========================================================================
     println!("=== Delete user 3 and cascade to orders ===");
     let user_id_to_delete: u64 = 3;
-    
+
     // Find and delete all orders for this user
     let order_ids = db.index_find("orders_by_user", &user_id_to_delete.to_le_bytes())?;
-    println!("Deleting {} orders for user {}...", order_ids.len(), user_id_to_delete);
-    
+    println!(
+        "Deleting {} orders for user {}...",
+        order_ids.len(),
+        user_id_to_delete
+    );
+
     for &order_id in &order_ids {
         let key = format!("order:{}", order_id);
         db.delete(key.as_bytes())?;
@@ -264,7 +282,7 @@ fn main() -> Result<()> {
         db.index_remove("orders_by_user", &user_id_to_delete.to_le_bytes())?;
         println!("  ✓ Deleted order {}", order_id);
     }
-    
+
     // Delete the user
     let key = format!("user:{}", user_id_to_delete);
     if let Some(data) = db.get(key.as_bytes())? {
@@ -283,8 +301,10 @@ fn main() -> Result<()> {
     println!("=== Final Database Statistics ===");
     let index_info = db.index_info()?;
     for info in index_info {
-        println!("Index '{}': {} entries ({:?})", 
-                 info.name, info.entry_count, info.index_type);
+        println!(
+            "Index '{}': {} entries ({:?})",
+            info.name, info.entry_count, info.index_type
+        );
     }
 
     Ok(())

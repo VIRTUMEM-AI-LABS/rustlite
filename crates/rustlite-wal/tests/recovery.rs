@@ -1,4 +1,5 @@
 // Recovery and crash scenario tests for WAL
+#![allow(clippy::field_reassign_with_default)]
 
 mod common;
 
@@ -110,7 +111,8 @@ fn test_recovery_with_transactions() {
     // (BEGIN_TX and COMMIT_TX markers are filtered out by recover())
     // Incomplete tx (tx_key2) should be rolled back
     assert_eq!(
-        records.len(), 1,
+        records.len(),
+        1,
         "Expected 1 data record from committed transaction"
     );
 }

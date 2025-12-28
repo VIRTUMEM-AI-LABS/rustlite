@@ -154,7 +154,7 @@ fn test_product_catalog_management() -> Result<()> {
             name: "Ergonomic Chair".to_string(),
             category: "Furniture".to_string(),
             price: 25000, // $250.00
-            stock: 0, // Out of stock
+            stock: 0,     // Out of stock
             active: false,
         },
     ];
@@ -167,8 +167,12 @@ fn test_product_catalog_management() -> Result<()> {
 
         db.index_insert("products_pk", &product.id.to_le_bytes(), product.id)?;
         db.index_insert("products_by_sku", product.sku.as_bytes(), product.id)?;
-        db.index_insert("products_by_category", product.category.as_bytes(), product.id)?;
-        
+        db.index_insert(
+            "products_by_category",
+            product.category.as_bytes(),
+            product.id,
+        )?;
+
         if product.active {
             db.index_insert("products_active", &product.id.to_le_bytes(), product.id)?;
         }
@@ -183,7 +187,8 @@ fn test_product_catalog_management() -> Result<()> {
 
     // Find active products only
     let info = db.index_info()?;
-    let active_count = info.iter()
+    let active_count = info
+        .iter()
         .find(|i| i.name == "products_active")
         .map(|i| i.entry_count)
         .unwrap_or(0);
@@ -230,8 +235,16 @@ fn test_shopping_cart_operations() -> Result<()> {
     let value = bincode::serialize(&cart_item).unwrap();
     db.put(key.as_bytes(), &value)?;
 
-    db.index_insert("cart_items_by_cart", &cart_id.to_le_bytes(), cart_item.product_id)?;
-    db.index_insert("cart_items_by_product", &cart_item.product_id.to_le_bytes(), cart_id)?;
+    db.index_insert(
+        "cart_items_by_cart",
+        &cart_id.to_le_bytes(),
+        cart_item.product_id,
+    )?;
+    db.index_insert(
+        "cart_items_by_product",
+        &cart_item.product_id.to_le_bytes(),
+        cart_id,
+    )?;
 
     // Retrieve all items in cart
     let item_ids = db.index_find("cart_items_by_cart", &cart_id.to_le_bytes())?;
@@ -295,7 +308,7 @@ fn test_order_creation_and_fulfillment() -> Result<()> {
     db.index_insert("orders_by_status", order.status.as_bytes(), order.id)?;
 
     // Add order items
-    let order_items = vec![
+    let order_items = [
         OrderItem {
             order_id,
             product_id: 1,
@@ -327,10 +340,10 @@ fn test_order_creation_and_fulfillment() -> Result<()> {
     // Update order status (confirmed -> shipped -> delivered)
     let mut updated_order = order.clone();
     updated_order.status = "confirmed".to_string();
-    
+
     let key = format!("order:{}", order.id);
     db.put(key.as_bytes(), &bincode::serialize(&updated_order).unwrap())?;
-    
+
     // Remove from pending, add to confirmed
     db.index_remove("orders_by_status", b"pending")?;
     db.index_insert("orders_by_status", b"confirmed", order.id)?;
@@ -458,7 +471,7 @@ fn test_bulk_product_import() -> Result<()> {
             } else {
                 "Clothing".to_string()
             },
-            price: (i * 100) as u64,
+            price: i * 100,
             stock: (i % 20 + 1) as u32,
             active: i % 10 != 0, // Every 10th product is inactive
         };
@@ -466,8 +479,12 @@ fn test_bulk_product_import() -> Result<()> {
         let key = format!("product:{}", product.id);
         db.put(key.as_bytes(), &bincode::serialize(&product).unwrap())?;
         db.index_insert("products_pk", &product.id.to_le_bytes(), product.id)?;
-        db.index_insert("products_by_category", product.category.as_bytes(), product.id)?;
-        
+        db.index_insert(
+            "products_by_category",
+            product.category.as_bytes(),
+            product.id,
+        )?;
+
         if product.active {
             db.index_insert("products_active", &product.id.to_le_bytes(), product.id)?;
         }
@@ -510,8 +527,11 @@ fn test_order_cancellation_workflow() -> Result<()> {
     // Cancel order
     let mut cancelled_order = order.clone();
     cancelled_order.status = "cancelled".to_string();
-    
-    db.put(key.as_bytes(), &bincode::serialize(&cancelled_order).unwrap())?;
+
+    db.put(
+        key.as_bytes(),
+        &bincode::serialize(&cancelled_order).unwrap(),
+    )?;
     db.index_remove("orders_by_status", b"pending")?;
     db.index_insert("orders_by_status", b"cancelled", order.id)?;
 

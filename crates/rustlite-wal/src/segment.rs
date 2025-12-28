@@ -148,7 +148,7 @@ impl SegmentManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{SyncMode, WalWriter, WalRecord};
+    use crate::{SyncMode, WalRecord, WalWriter};
     use tempfile::TempDir;
 
     fn setup_test_wal() -> (TempDir, PathBuf) {
@@ -176,8 +176,8 @@ mod tests {
 
         // Create some segments by writing and rotating
         {
-            let mut writer = WalWriter::new(&wal_path, 50, SyncMode::Sync)
-                .expect("Failed to create writer");
+            let mut writer =
+                WalWriter::new(&wal_path, 50, SyncMode::Sync).expect("Failed to create writer");
 
             for i in 0..10 {
                 writer
@@ -228,8 +228,8 @@ mod tests {
         let (_temp_dir, wal_path) = setup_test_wal();
 
         {
-            let mut writer = WalWriter::new(&wal_path, 50, SyncMode::Sync)
-                .expect("Failed to create writer");
+            let mut writer =
+                WalWriter::new(&wal_path, 50, SyncMode::Sync).expect("Failed to create writer");
 
             for i in 0..10 {
                 writer
@@ -257,8 +257,8 @@ mod tests {
         let (_temp_dir, wal_path) = setup_test_wal();
 
         {
-            let mut writer = WalWriter::new(&wal_path, 50, SyncMode::Sync)
-                .expect("Failed to create writer");
+            let mut writer =
+                WalWriter::new(&wal_path, 50, SyncMode::Sync).expect("Failed to create writer");
 
             for i in 0..10 {
                 writer
@@ -272,8 +272,14 @@ mod tests {
 
         let manager = SegmentManager::new(wal_path);
 
-        let oldest = manager.oldest_segment().unwrap().expect("Should have oldest");
-        let latest = manager.latest_segment().unwrap().expect("Should have latest");
+        let oldest = manager
+            .oldest_segment()
+            .unwrap()
+            .expect("Should have oldest");
+        let latest = manager
+            .latest_segment()
+            .unwrap()
+            .expect("Should have latest");
 
         assert!(oldest.sequence <= latest.sequence);
     }

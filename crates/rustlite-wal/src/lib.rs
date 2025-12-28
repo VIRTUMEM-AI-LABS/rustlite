@@ -6,7 +6,7 @@
 //! ## ⚠️ Internal Implementation Detail
 //!
 //! **This crate is an internal implementation detail of RustLite.**
-//! 
+//!
 //! Users should depend on the main [`rustlite`](https://crates.io/crates/rustlite) crate
 //! instead, which provides the stable public API. This crate's API may change
 //! without notice between minor versions.
@@ -251,7 +251,9 @@ mod tests {
             manager.open().expect("Failed to open");
 
             manager.append(WalRecord::begin_tx(1)).expect("Failed");
-            manager.append(WalRecord::put(b"k".to_vec(), b"v".to_vec())).expect("Failed");
+            manager
+                .append(WalRecord::put(b"k".to_vec(), b"v".to_vec()))
+                .expect("Failed");
             manager.append(WalRecord::commit_tx(1)).expect("Failed");
 
             manager.close().expect("Failed to close");
@@ -272,7 +274,9 @@ mod tests {
         {
             let mut manager = WalManager::new(config.clone()).expect("Failed to create manager");
             manager.open().expect("Failed to open");
-            manager.append(WalRecord::put(b"k".to_vec(), b"v".to_vec())).expect("Failed");
+            manager
+                .append(WalRecord::put(b"k".to_vec(), b"v".to_vec()))
+                .expect("Failed");
             manager.close().expect("Failed to close");
         }
 

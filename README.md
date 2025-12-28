@@ -14,6 +14,8 @@
 
 **RustLite** is a lightweight, high-performance embedded database written entirely in Rust. Designed for applications that need a fast, reliable, and embeddable storage solution with ACID guarantees.
 
+> **⚠️ Important**: RustLite is a **key-value store with MVCC transactions**, not a full relational database. It's similar to LevelDB or RocksDB (but with transactions), NOT SQLite or PostgreSQL. While it includes a basic SQL-like query engine for simple SELECT operations, it lacks schemas, CREATE TABLE, data types, functions, and constraints. For full SQL support, use [rusqlite](https://docs.rs/rusqlite) or SQLite directly.
+
 ## 🎯 Vision
 
 RustLite aims to be the go-to embedded database for Rust applications, combining:
@@ -23,22 +25,44 @@ RustLite aims to be the go-to embedded database for Rust applications, combining
 - **Simplicity**: Single-file deployment, zero configuration, intuitive API
 - **Safety**: Memory-safe by design using Rust's type system and ownership model
 
+## 💡 Ideal Use Cases
+
+RustLite excels in scenarios where you need fast, transactional key-value storage:
+
+- **📱 Embedded Applications**: Mobile/desktop apps needing local data storage
+- **🔧 Application State**: Configuration, settings, and application metadata
+- **💾 Caching Layer**: High-performance caching with persistence
+- **🎫 Session Storage**: Web session management with ACID guarantees
+- **📊 Time-Series Data**: Event logs, metrics, and analytics data
+- **🔄 Event Sourcing**: Append-only event stores with snapshot isolation
+- **📨 Message Queues**: Lightweight job queues and task schedulers
+- **🎮 Game State**: Player progress, inventory, and game world persistence
+- **📝 Document Storage**: Key-based document retrieval (JSON, MessagePack, etc.)
+- **🔐 Credential Vaults**: Secure local storage for API keys and secrets
+
+**Not Ideal For:**
+- ❌ Complex relational queries with JOINs across multiple tables
+- ❌ Applications requiring SQL compatibility (use SQLite/PostgreSQL)
+- ❌ Full-text search (no FTS support yet)
+- ❌ Large-scale distributed systems (single-node only)
+
 ## ✨ Features
 
-### Current (v0.3.0)
+### Current (v0.5.0)
 - ✅ **Persistent storage** with LSM-tree architecture
 - ✅ **Write-Ahead Logging (WAL)** for crash recovery
 - ✅ **SSTable compaction** for optimized disk usage
 - ✅ **Snapshot backups** for point-in-time recovery
 - ✅ **B-Tree indexing** for range queries and ordered lookups
 - ✅ **Hash indexing** for O(1) exact-match lookups
+- ✅ **SQL-like query engine** with SELECT, WHERE, LIMIT support
+- ✅ **Full MVCC transactions** with snapshot isolation
 - ✅ Thread-safe concurrent access
 - ✅ Simple, ergonomic API
 
 ### Roadmap
-- 🔄 **v0.4**: SQL-like query engine
-- 🔄 **v0.5**: Full transaction support with MVCC
-- 🔄 **v1.0**: Production-ready with ACID guarantees
+- 🔄 **v0.6**: Advanced query optimization and joins
+- 🔄 **v1.0**: Production-ready with full ACID guarantees
 
 See [docs/ROADMAP.md](docs/ROADMAP.md) for detailed plans.
 
@@ -48,8 +72,48 @@ Add RustLite to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rustlite = "0.3"
+rustlite = "0.5"
 ```
+
+### Transactions with MVCC (v0.5.0+)
+
+```rust
+use rustlite::{Database, IsolationLevel};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let db = Database::open("./my_database")?;
+    
+    // Begin a transaction with snapshot isolation (default)
+    let mut txn = db.begin()?;
+    
+    // All reads see a consistent snapshot
+    txn.put(b"account:alice".to_vec(), b"1000".to_vec())?;
+    txn.put(b"account:bob".to_vec(), b"500".to_vec())?;
+    
+    // Transfer money atomically
+    let alice = txn.get(b"account:alice")?.unwrap();
+    let bob = txn.get(b"account:bob")?.unwrap();
+    
+    let alice_bal: i32 = String::from_utf8_lossy(&alice).parse()?;
+    let bob_bal: i32 = String::from_utf8_lossy(&bob).parse()?;
+    
+    txn.put(b"account:alice".to_vec(), (alice_bal - 200).to_string().into_bytes())?;
+    txn.put(b"account:bob".to_vec(), (bob_bal + 200).to_string().into_bytes())?;
+    
+    // Commit (or rollback on error)
+    txn.commit()?;
+    
+    Ok(())
+}
+```
+
+**Isolation Levels:**
+- `ReadUncommitted`: Fastest, may see uncommitted changes
+- `ReadCommitted`: See only committed data
+- `RepeatableRead`: Snapshot isolation (default)
+- `Serializable`: Strictest consistency
+
+See [examples/transaction_demo.rs](crates/rustlite-api/examples/transaction_demo.rs) for comprehensive examples.
 
 ### Persistent Database (Recommended)
 

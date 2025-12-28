@@ -30,13 +30,9 @@ pub enum ManifestRecord {
         sequence: u64,
     },
     /// Remove an SSTable (after compaction)
-    RemoveSSTable {
-        path: String,
-    },
+    RemoveSSTable { path: String },
     /// Update the current sequence number
-    UpdateSequence {
-        sequence: u64,
-    },
+    UpdateSequence { sequence: u64 },
     /// Compaction completed
     CompactionDone {
         level: u32,
@@ -170,8 +166,8 @@ impl Manifest {
     /// Write a record to the manifest log
     fn write_record(&mut self, record: &ManifestRecord) -> Result<()> {
         if let Some(ref mut writer) = self.log_writer {
-            let encoded = bincode::serialize(record)
-                .map_err(|e| Error::Serialization(e.to_string()))?;
+            let encoded =
+                bincode::serialize(record).map_err(|e| Error::Serialization(e.to_string()))?;
             let len = encoded.len() as u32;
 
             writer.write_all(&len.to_le_bytes())?;
@@ -203,8 +199,8 @@ impl Manifest {
         }
 
         // Write new snapshot
-        let encoded = bincode::serialize(&self.snapshot)
-            .map_err(|e| Error::Serialization(e.to_string()))?;
+        let encoded =
+            bincode::serialize(&self.snapshot).map_err(|e| Error::Serialization(e.to_string()))?;
 
         fs::write(&manifest_path, &encoded)?;
 
@@ -242,9 +238,9 @@ impl Manifest {
             file_size: meta.file_size,
             sequence: meta.sequence,
         };
-        
+
         self.snapshot.sstables.push(sstable);
-        
+
         self.write_record(&ManifestRecord::AddSSTable {
             level: meta.level,
             path: meta.path.to_string_lossy().to_string(),
@@ -254,29 +250,27 @@ impl Manifest {
             file_size: meta.file_size,
             sequence: meta.sequence,
         })?;
-        
+
         Ok(())
     }
 
     /// Remove an SSTable from the manifest
     pub fn remove_sstable(&mut self, path: &Path) -> Result<()> {
         let path_str = path.to_string_lossy().to_string();
-        
+
         self.snapshot.sstables.retain(|s| s.path != path_str);
-        
-        self.write_record(&ManifestRecord::RemoveSSTable {
-            path: path_str,
-        })?;
-        
+
+        self.write_record(&ManifestRecord::RemoveSSTable { path: path_str })?;
+
         Ok(())
     }
 
     /// Update the sequence number
     pub fn update_sequence(&mut self, sequence: u64) -> Result<()> {
         self.snapshot.sequence = sequence;
-        
+
         self.write_record(&ManifestRecord::UpdateSequence { sequence })?;
-        
+
         Ok(())
     }
 
@@ -287,7 +281,9 @@ impl Manifest {
 
     /// Get all SSTables at a given level
     pub fn sstables_at_level(&self, level: u32) -> Vec<&ManifestSSTable> {
-        self.snapshot.sstables.iter()
+        self.snapshot
+            .sstables
+            .iter()
             .filter(|s| s.level == level)
             .collect()
     }
@@ -299,16 +295,19 @@ impl Manifest {
 
     /// Get the number of SSTables at each level
     pub fn level_counts(&self) -> Vec<usize> {
-        let max_level = self.snapshot.sstables.iter()
+        let max_level = self
+            .snapshot
+            .sstables
+            .iter()
             .map(|s| s.level)
             .max()
             .unwrap_or(0);
-        
+
         let mut counts = vec![0usize; (max_level + 1) as usize];
         for sst in &self.snapshot.sstables {
             counts[sst.level as usize] += 1;
         }
-        
+
         counts
     }
 
@@ -318,12 +317,19 @@ impl Manifest {
     }
 
     /// Record a compaction completion
-    pub fn record_compaction(&mut self, level: u32, inputs: Vec<PathBuf>, outputs: Vec<SSTableMeta>) -> Result<()> {
+    pub fn record_compaction(
+        &mut self,
+        level: u32,
+        inputs: Vec<PathBuf>,
+        outputs: Vec<SSTableMeta>,
+    ) -> Result<()> {
         // Remove input files from manifest
         for input in &inputs {
-            self.snapshot.sstables.retain(|s| s.path != input.to_string_lossy());
+            self.snapshot
+                .sstables
+                .retain(|s| s.path != input.to_string_lossy());
         }
-        
+
         // Add output files to manifest
         for output in &outputs {
             let sstable = ManifestSSTable {
@@ -337,14 +343,20 @@ impl Manifest {
             };
             self.snapshot.sstables.push(sstable);
         }
-        
+
         // Write record
         self.write_record(&ManifestRecord::CompactionDone {
             level,
-            inputs: inputs.iter().map(|p| p.to_string_lossy().to_string()).collect(),
-            outputs: outputs.iter().map(|p| p.path.to_string_lossy().to_string()).collect(),
+            inputs: inputs
+                .iter()
+                .map(|p| p.to_string_lossy().to_string())
+                .collect(),
+            outputs: outputs
+                .iter()
+                .map(|p| p.path.to_string_lossy().to_string())
+                .collect(),
         })?;
-        
+
         Ok(())
     }
 }
@@ -358,7 +370,7 @@ mod tests {
     fn test_manifest_create() {
         let dir = tempdir().unwrap();
         let manifest = Manifest::open(dir.path()).unwrap();
-        
+
         assert_eq!(manifest.sequence(), 0);
         assert!(manifest.all_sstables().is_empty());
     }
@@ -367,7 +379,7 @@ mod tests {
     fn test_manifest_add_sstable() {
         let dir = tempdir().unwrap();
         let mut manifest = Manifest::open(dir.path()).unwrap();
-        
+
         let meta = SSTableMeta {
             path: PathBuf::from("test.sst"),
             min_key: b"a".to_vec(),
@@ -377,9 +389,9 @@ mod tests {
             level: 0,
             sequence: 1,
         };
-        
+
         manifest.add_sstable(&meta).unwrap();
-        
+
         assert_eq!(manifest.all_sstables().len(), 1);
         assert_eq!(manifest.sstables_at_level(0).len(), 1);
         assert_eq!(manifest.sstables_at_level(1).len(), 0);
@@ -389,7 +401,7 @@ mod tests {
     fn test_manifest_remove_sstable() {
         let dir = tempdir().unwrap();
         let mut manifest = Manifest::open(dir.path()).unwrap();
-        
+
         let meta = SSTableMeta {
             path: PathBuf::from("test.sst"),
             min_key: b"a".to_vec(),
@@ -399,10 +411,10 @@ mod tests {
             level: 0,
             sequence: 1,
         };
-        
+
         manifest.add_sstable(&meta).unwrap();
         assert_eq!(manifest.all_sstables().len(), 1);
-        
+
         manifest.remove_sstable(Path::new("test.sst")).unwrap();
         assert!(manifest.all_sstables().is_empty());
     }
@@ -411,7 +423,7 @@ mod tests {
     fn test_manifest_sequence() {
         let dir = tempdir().unwrap();
         let mut manifest = Manifest::open(dir.path()).unwrap();
-        
+
         manifest.update_sequence(100).unwrap();
         assert_eq!(manifest.sequence(), 100);
     }
@@ -420,7 +432,7 @@ mod tests {
     fn test_manifest_level_counts() {
         let dir = tempdir().unwrap();
         let mut manifest = Manifest::open(dir.path()).unwrap();
-        
+
         for i in 0..3 {
             let meta = SSTableMeta {
                 path: PathBuf::from(format!("l0_{}.sst", i)),
@@ -433,7 +445,7 @@ mod tests {
             };
             manifest.add_sstable(&meta).unwrap();
         }
-        
+
         for i in 0..2 {
             let meta = SSTableMeta {
                 path: PathBuf::from(format!("l1_{}.sst", i)),
@@ -446,7 +458,7 @@ mod tests {
             };
             manifest.add_sstable(&meta).unwrap();
         }
-        
+
         let counts = manifest.level_counts();
         assert_eq!(counts[0], 3);
         assert_eq!(counts[1], 2);

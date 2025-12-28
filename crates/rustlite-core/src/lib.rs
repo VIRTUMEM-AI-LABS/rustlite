@@ -5,7 +5,7 @@
 //! ## ⚠️ Internal Implementation Detail
 //!
 //! **This crate is an internal implementation detail of RustLite.**
-//! 
+//!
 //! Users should depend on the main [`rustlite`](https://crates.io/crates/rustlite) crate
 //! instead, which provides the stable public API. This crate's API may change
 //! without notice between minor versions.
@@ -21,9 +21,13 @@
 
 pub mod error;
 pub mod index;
+/// SQL-like query engine (v0.4+)
 pub mod query;
 pub mod storage;
 pub mod transaction;
+
+#[cfg(test)]
+mod transaction_tests;
 
 pub use error::{Error, Result};
 

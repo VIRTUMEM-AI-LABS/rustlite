@@ -1,4 +1,5 @@
 // Integration tests for WAL basic functionality
+#![allow(clippy::field_reassign_with_default)]
 
 mod common;
 

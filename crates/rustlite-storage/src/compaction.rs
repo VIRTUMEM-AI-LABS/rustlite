@@ -6,8 +6,8 @@
 use crate::manifest::Manifest;
 use crate::sstable::{delete_sstable, SSTableEntry, SSTableMeta, SSTableReader, SSTableWriter};
 use rustlite_core::Result;
-use std::collections::BinaryHeap;
 use std::cmp::Ordering;
+use std::collections::BinaryHeap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering as AtomicOrdering};
 use std::sync::Arc;
@@ -129,20 +129,21 @@ impl CompactionWorker {
         if level0_count >= self.config.level0_trigger {
             return Some(0);
         }
-        
+
         // Check other levels by size
         for level in 1..self.config.max_levels {
-            let level_size: u64 = manifest.sstables_at_level(level)
+            let level_size: u64 = manifest
+                .sstables_at_level(level)
                 .iter()
                 .map(|s| s.file_size)
                 .sum();
-            
+
             let max_size = self.max_size_for_level(level);
             if level_size > max_size {
                 return Some(level);
             }
         }
-        
+
         None
     }
 
@@ -151,7 +152,7 @@ impl CompactionWorker {
         if level == 0 {
             return u64::MAX; // Level 0 is count-based, not size-based
         }
-        
+
         let mut size = self.config.level1_max_size;
         for _ in 1..level {
             size *= self.config.level_multiplier as u64;
@@ -166,11 +167,10 @@ impl CompactionWorker {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_millis();
-        
-        self.dir.join("sst").join(format!(
-            "L{}_{}_{}.sst",
-            level, timestamp, counter
-        ))
+
+        self.dir
+            .join("sst")
+            .join(format!("L{}_{}_{}.sst", level, timestamp, counter))
     }
 
     /// Compact level 0 to level 1
@@ -179,62 +179,68 @@ impl CompactionWorker {
         if level0_sstables.is_empty() {
             return Ok(());
         }
-        
+
         // Collect all level 0 SSTable paths
         let input_paths: Vec<PathBuf> = level0_sstables
             .iter()
             .map(|s| PathBuf::from(&s.path))
             .collect();
-        
+
         // Find overlapping level 1 SSTables
         let level1_sstables = manifest.sstables_at_level(1);
-        
+
         // For simplicity, merge all level 0 with overlapping level 1
         let mut all_inputs: Vec<PathBuf> = input_paths.clone();
-        
+
         // Get min/max key range from level 0
-        let min_key: Vec<u8> = level0_sstables.iter()
+        let min_key: Vec<u8> = level0_sstables
+            .iter()
             .map(|s| s.min_key.clone())
             .min()
             .unwrap_or_default();
-        let max_key: Vec<u8> = level0_sstables.iter()
+        let max_key: Vec<u8> = level0_sstables
+            .iter()
             .map(|s| s.max_key.clone())
             .max()
             .unwrap_or_default();
-        
+
         // Add overlapping level 1 SSTables
         for sst in level1_sstables {
             if sst.max_key >= min_key && sst.min_key <= max_key {
                 all_inputs.push(PathBuf::from(&sst.path));
             }
         }
-        
+
         // Perform the merge
         let outputs = self.merge_sstables(&all_inputs, 1)?;
-        
+
         // Update manifest
         manifest.record_compaction(0, all_inputs.clone(), outputs)?;
-        
+
         // Delete old files
         for path in all_inputs {
             let _ = delete_sstable(&path);
         }
-        
+
         self.stats.compaction_count += 1;
-        
+
         Ok(())
     }
 
     /// Merge multiple SSTables into new SSTables at the target level
-    fn merge_sstables(&mut self, inputs: &[PathBuf], target_level: u32) -> Result<Vec<SSTableMeta>> {
+    fn merge_sstables(
+        &mut self,
+        inputs: &[PathBuf],
+        target_level: u32,
+    ) -> Result<Vec<SSTableMeta>> {
         if inputs.is_empty() {
             return Ok(Vec::new());
         }
-        
+
         // Create SST directory if needed
         let sst_dir = self.dir.join("sst");
         std::fs::create_dir_all(&sst_dir)?;
-        
+
         // Open all input SSTables
         let mut readers: Vec<SSTableReader> = Vec::new();
         for path in inputs {
@@ -248,17 +254,18 @@ impl CompactionWorker {
                 }
             }
         }
-        
+
         if readers.is_empty() {
             return Ok(Vec::new());
         }
-        
+
         // Initialize merge heap
         let mut heap: BinaryHeap<MergeEntry> = BinaryHeap::new();
-        let mut iterators: Vec<_> = readers.iter_mut()
+        let mut iterators: Vec<_> = readers
+            .iter_mut()
             .map(|r| r.iter())
             .collect::<Result<Vec<_>>>()?;
-        
+
         // Prime the heap with first entry from each SSTable
         for (idx, iter) in iterators.iter_mut().enumerate() {
             if let Some(entry) = iter.next_entry()? {
@@ -269,13 +276,13 @@ impl CompactionWorker {
                 });
             }
         }
-        
+
         // Output SSTables
         let mut outputs: Vec<SSTableMeta> = Vec::new();
         let mut current_writer: Option<SSTableWriter> = None;
         let mut current_size: u64 = 0;
         let mut last_key: Option<Vec<u8>> = None;
-        
+
         while let Some(merge_entry) = heap.pop() {
             // Skip duplicate keys (keep the newest - higher source_idx)
             if last_key.as_ref() == Some(&merge_entry.key) {
@@ -290,7 +297,7 @@ impl CompactionWorker {
                 }
                 continue;
             }
-            
+
             // Start a new SSTable if needed
             if current_writer.is_none() || current_size >= self.config.target_file_size {
                 // Finish current writer
@@ -299,22 +306,22 @@ impl CompactionWorker {
                     self.stats.bytes_written += meta.file_size;
                     outputs.push(meta);
                 }
-                
+
                 // Start new writer
                 let path = self.next_sstable_path(target_level);
                 current_writer = Some(SSTableWriter::new(&path)?);
                 current_size = 0;
             }
-            
+
             // Write entry
             if let Some(ref mut writer) = current_writer {
                 let entry_size = merge_entry.entry.key.len() + merge_entry.entry.value.len() + 10;
                 writer.add(merge_entry.entry.clone())?;
                 current_size += entry_size as u64;
             }
-            
+
             last_key = Some(merge_entry.key);
-            
+
             // Advance the iterator that provided this entry
             if let Some(next) = iterators[merge_entry.source_idx].next_entry()? {
                 heap.push(MergeEntry {
@@ -324,22 +331,23 @@ impl CompactionWorker {
                 });
             }
         }
-        
+
         // Finish last writer
         if let Some(writer) = current_writer {
             let meta = writer.finish()?;
             self.stats.bytes_written += meta.file_size;
             outputs.push(meta);
         }
-        
+
         // Update level in output metadata
-        let outputs: Vec<SSTableMeta> = outputs.into_iter()
+        let outputs: Vec<SSTableMeta> = outputs
+            .into_iter()
             .map(|mut m| {
                 m.level = target_level;
                 m
             })
             .collect();
-        
+
         Ok(outputs)
     }
 
@@ -353,7 +361,7 @@ impl CompactionWorker {
         if self.stop_flag.load(AtomicOrdering::Relaxed) {
             return Ok(false);
         }
-        
+
         if let Some(level) = self.pick_compaction_level(manifest) {
             if level == 0 {
                 self.compact_level0(manifest)?;
@@ -361,7 +369,7 @@ impl CompactionWorker {
             }
             // TODO: Implement higher level compaction
         }
-        
+
         Ok(false)
     }
 }
@@ -391,7 +399,7 @@ mod tests {
             entry: SSTableEntry::value(b"b".to_vec(), b"2".to_vec()),
             source_idx: 0,
         };
-        
+
         // In a max-heap, larger values come first
         // We want min-heap behavior, so e1 (key "a") should be "greater"
         assert!(e1 > e2);
@@ -406,9 +414,9 @@ mod tests {
         };
         let worker = CompactionWorker::new(dir.path(), config);
         let mut manifest = Manifest::open(dir.path()).unwrap();
-        
+
         assert!(!worker.needs_compaction(&manifest));
-        
+
         // Add level 0 SSTables
         for i in 0..2 {
             let meta = SSTableMeta {
@@ -422,7 +430,7 @@ mod tests {
             };
             manifest.add_sstable(&meta).unwrap();
         }
-        
+
         assert!(worker.needs_compaction(&manifest));
     }
 
@@ -431,27 +439,35 @@ mod tests {
         let dir = tempdir().unwrap();
         let sst_dir = dir.path().join("sst");
         std::fs::create_dir_all(&sst_dir).unwrap();
-        
+
         // Create two SSTables with overlapping keys
         let path1 = sst_dir.join("test1.sst");
         let mut writer1 = SSTableWriter::new(&path1).unwrap();
-        writer1.add(SSTableEntry::value(b"a".to_vec(), b"1".to_vec())).unwrap();
-        writer1.add(SSTableEntry::value(b"c".to_vec(), b"3".to_vec())).unwrap();
+        writer1
+            .add(SSTableEntry::value(b"a".to_vec(), b"1".to_vec()))
+            .unwrap();
+        writer1
+            .add(SSTableEntry::value(b"c".to_vec(), b"3".to_vec()))
+            .unwrap();
         writer1.finish().unwrap();
-        
+
         let path2 = sst_dir.join("test2.sst");
         let mut writer2 = SSTableWriter::new(&path2).unwrap();
-        writer2.add(SSTableEntry::value(b"b".to_vec(), b"2".to_vec())).unwrap();
-        writer2.add(SSTableEntry::value(b"c".to_vec(), b"3-new".to_vec())).unwrap(); // Overwrites
+        writer2
+            .add(SSTableEntry::value(b"b".to_vec(), b"2".to_vec()))
+            .unwrap();
+        writer2
+            .add(SSTableEntry::value(b"c".to_vec(), b"3-new".to_vec()))
+            .unwrap(); // Overwrites
         writer2.finish().unwrap();
-        
+
         // Merge
         let config = CompactionConfig::default();
         let mut worker = CompactionWorker::new(dir.path(), config);
         let outputs = worker.merge_sstables(&[path1, path2], 1).unwrap();
-        
+
         assert!(!outputs.is_empty());
-        
+
         // Verify merged content
         let mut reader = SSTableReader::open(&outputs[0].path).unwrap();
         assert_eq!(reader.get(b"a").unwrap().unwrap().value, b"1".to_vec());

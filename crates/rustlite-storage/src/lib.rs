@@ -5,7 +5,7 @@
 //! ## ⚠️ Internal Implementation Detail
 //!
 //! **This crate is an internal implementation detail of RustLite.**
-//! 
+//!
 //! Users should depend on the main [`rustlite`](https://crates.io/crates/rustlite) crate
 //! instead, which provides the stable public API. This crate's API may change
 //! without notice between minor versions.
@@ -167,7 +167,7 @@ impl StorageEngine {
                 _ => {}
             }
         }
-        
+
         Ok(())
     }
 
@@ -211,10 +211,13 @@ impl StorageEngine {
                 };
             }
         }
-        
+
         // Check immutable memtables (newest first)
         {
-            let immutable = self.immutable_memtables.lock().map_err(|_| Error::LockPoisoned)?;
+            let immutable = self
+                .immutable_memtables
+                .lock()
+                .map_err(|_| Error::LockPoisoned)?;
             for mt in immutable.iter().rev() {
                 if let Some(result) = mt.get(key) {
                     return match result {
@@ -224,25 +227,25 @@ impl StorageEngine {
                 }
             }
         }
-        
+
         // Check SSTables (newest first, level 0 first)
         {
             let manifest = self.manifest.lock().map_err(|_| Error::LockPoisoned)?;
-            
+
             // Check each level
             for level in 0..7 {
                 let sstables = manifest.sstables_at_level(level);
-                
+
                 // Sort by sequence (newest first)
                 let mut sorted: Vec<_> = sstables.iter().collect();
                 sorted.sort_by(|a, b| b.sequence.cmp(&a.sequence));
-                
+
                 for sst in sorted {
                     // Quick range check
                     if key < sst.min_key.as_slice() || key > sst.max_key.as_slice() {
                         continue;
                     }
-                    
+
                     // Open and search SSTable
                     let path = PathBuf::from(&sst.path);
                     if let Ok(mut reader) = SSTableReader::open(&path) {
@@ -256,7 +259,7 @@ impl StorageEngine {
                 }
             }
         }
-        
+
         Ok(None)
     }
 
@@ -291,11 +294,11 @@ impl StorageEngine {
             let memtable = self.memtable.read().map_err(|_| Error::LockPoisoned)?;
             memtable.size_bytes() >= self.config.memtable_size
         };
-        
+
         if should_flush {
             self.flush()?;
         }
-        
+
         Ok(())
     }
 
@@ -308,53 +311,60 @@ impl StorageEngine {
             let old = std::mem::replace(&mut *memtable, Memtable::with_sequence(sequence));
             Arc::new(old)
         };
-        
+
         if old_memtable.is_empty() {
             return Ok(());
         }
-        
+
         // Add to immutable list
         {
-            let mut immutable = self.immutable_memtables.lock().map_err(|_| Error::LockPoisoned)?;
+            let mut immutable = self
+                .immutable_memtables
+                .lock()
+                .map_err(|_| Error::LockPoisoned)?;
             immutable.push(Arc::clone(&old_memtable));
         }
-        
+
         // Generate SSTable path
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_millis();
         let sst_path = self.dir.join("sst").join(format!("L0_{}.sst", timestamp));
-        
+
         // Create a cloned memtable for iteration
         let mt_for_iter = {
-            let entries: Vec<_> = old_memtable.iter()
+            let entries: Vec<_> = old_memtable
+                .iter()
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect();
             entries
         };
-        
+
         // Write SSTable
         let meta = SSTableWriter::from_memtable(&sst_path, mt_for_iter.into_iter())?;
-        
+
         // Update manifest
         {
             let mut manifest = self.manifest.lock().map_err(|_| Error::LockPoisoned)?;
             manifest.add_sstable(&meta)?;
             manifest.update_sequence(old_memtable.sequence())?;
         }
-        
+
         // Remove from immutable list
         {
-            let mut immutable = self.immutable_memtables.lock().map_err(|_| Error::LockPoisoned)?;
+            let mut immutable = self
+                .immutable_memtables
+                .lock()
+                .map_err(|_| Error::LockPoisoned)?;
             immutable.retain(|m| !Arc::ptr_eq(m, &old_memtable));
         }
-        
+
         // Maybe trigger compaction
         if self.config.enable_compaction {
             self.maybe_compact()?;
         }
-        
+
         Ok(())
     }
 
@@ -362,11 +372,11 @@ impl StorageEngine {
     fn maybe_compact(&self) -> Result<()> {
         let mut compactor = self.compactor.lock().map_err(|_| Error::LockPoisoned)?;
         let mut manifest = self.manifest.lock().map_err(|_| Error::LockPoisoned)?;
-        
+
         if compactor.needs_compaction(&manifest) {
             compactor.compact_level0(&mut manifest)?;
         }
-        
+
         Ok(())
     }
 
@@ -377,16 +387,16 @@ impl StorageEngine {
             let mut wal = self.wal.lock().map_err(|_| Error::LockPoisoned)?;
             wal.sync()?;
         }
-        
+
         // Flush memtable
         self.flush()?;
-        
+
         // Rewrite manifest
         {
             let mut manifest = self.manifest.lock().map_err(|_| Error::LockPoisoned)?;
             manifest.rewrite()?;
         }
-        
+
         Ok(())
     }
 
@@ -404,7 +414,10 @@ impl StorageEngine {
         StorageStats {
             memtable_size,
             memtable_entries,
-            sstable_count: manifest.as_ref().map(|m| m.all_sstables().len()).unwrap_or(0),
+            sstable_count: manifest
+                .as_ref()
+                .map(|m| m.all_sstables().len())
+                .unwrap_or(0),
             total_disk_size: manifest.as_ref().map(|m| m.total_size()).unwrap_or(0),
             level_counts: manifest.map(|m| m.level_counts()).unwrap_or_default(),
             compaction_stats: compactor.map(|c| c.stats().clone()).unwrap_or_default(),
@@ -446,11 +459,11 @@ mod tests {
     fn test_storage_engine_basic() {
         let dir = tempdir().unwrap();
         let engine = StorageEngine::open(dir.path()).unwrap();
-        
+
         // Put and get
         engine.put(b"key1", b"value1").unwrap();
         engine.put(b"key2", b"value2").unwrap();
-        
+
         assert_eq!(engine.get(b"key1").unwrap(), Some(b"value1".to_vec()));
         assert_eq!(engine.get(b"key2").unwrap(), Some(b"value2".to_vec()));
         assert_eq!(engine.get(b"key3").unwrap(), None);
@@ -460,10 +473,10 @@ mod tests {
     fn test_storage_engine_update() {
         let dir = tempdir().unwrap();
         let engine = StorageEngine::open(dir.path()).unwrap();
-        
+
         engine.put(b"key", b"value1").unwrap();
         assert_eq!(engine.get(b"key").unwrap(), Some(b"value1".to_vec()));
-        
+
         engine.put(b"key", b"value2").unwrap();
         assert_eq!(engine.get(b"key").unwrap(), Some(b"value2".to_vec()));
     }
@@ -472,10 +485,10 @@ mod tests {
     fn test_storage_engine_delete() {
         let dir = tempdir().unwrap();
         let engine = StorageEngine::open(dir.path()).unwrap();
-        
+
         engine.put(b"key", b"value").unwrap();
         assert_eq!(engine.get(b"key").unwrap(), Some(b"value".to_vec()));
-        
+
         engine.delete(b"key").unwrap();
         assert_eq!(engine.get(b"key").unwrap(), None);
     }
@@ -489,20 +502,20 @@ mod tests {
             ..Default::default()
         };
         let engine = StorageEngine::open_with_config(dir.path(), config).unwrap();
-        
+
         // Write enough to trigger flush
         for i in 0..10 {
             let key = format!("key{:03}", i);
             let value = format!("value{}", i);
             engine.put(key.as_bytes(), value.as_bytes()).unwrap();
         }
-        
+
         // Force flush
         engine.flush().unwrap();
-        
+
         // Data should still be accessible
         assert_eq!(engine.get(b"key000").unwrap(), Some(b"value0".to_vec()));
-        
+
         // Check stats
         let stats = engine.stats();
         assert!(stats.sstable_count > 0 || stats.memtable_entries > 0);
@@ -511,14 +524,14 @@ mod tests {
     #[test]
     fn test_storage_engine_recovery() {
         let dir = tempdir().unwrap();
-        
+
         // Write some data
         {
             let engine = StorageEngine::open(dir.path()).unwrap();
             engine.put(b"persistent", b"data").unwrap();
             // Don't call close - simulate crash
         }
-        
+
         // Reopen and verify data is recovered
         {
             let engine = StorageEngine::open(dir.path()).unwrap();
@@ -530,9 +543,9 @@ mod tests {
     fn test_storage_stats() {
         let dir = tempdir().unwrap();
         let engine = StorageEngine::open(dir.path()).unwrap();
-        
+
         engine.put(b"key", b"value").unwrap();
-        
+
         let stats = engine.stats();
         assert!(stats.memtable_size > 0 || stats.memtable_entries > 0);
     }

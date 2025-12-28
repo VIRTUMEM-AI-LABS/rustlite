@@ -5,7 +5,7 @@
 //! ## ⚠️ Internal Implementation Detail
 //!
 //! **This crate is an internal implementation detail of RustLite.**
-//! 
+//!
 //! Users should depend on the main [`rustlite`](https://crates.io/crates/rustlite) crate
 //! instead, which provides the stable public API. This crate's API may change
 //! without notice between minor versions.
@@ -196,10 +196,10 @@ impl SnapshotManager {
                 }
             }
         }
-        
+
         // Get sequence number from manifest
         let sequence = self.read_sequence()?;
-        
+
         // Create metadata
         let meta = SnapshotMeta {
             id: id.clone(),
@@ -212,13 +212,13 @@ impl SnapshotManager {
             snapshot_type: SnapshotType::Full,
             parent_id: None,
         };
-        
+
         // Write metadata file
         self.write_metadata(&dest, &meta)?;
-        
+
         // Track snapshot
         self.snapshots.push(meta.clone());
-        
+
         Ok(meta)
     }
 
@@ -308,7 +308,7 @@ impl SnapshotManager {
         if !manifest_path.exists() {
             return Ok(0);
         }
-        
+
         // For now, return 0 - in a real implementation, we'd parse the manifest
         Ok(0)
     }
@@ -319,8 +319,7 @@ impl SnapshotManager {
         let file = File::create(&meta_path)?;
         let mut writer = BufWriter::new(file);
 
-        let encoded =
-            bincode::serialize(meta).map_err(|e| Error::Serialization(e.to_string()))?;
+        let encoded = bincode::serialize(meta).map_err(|e| Error::Serialization(e.to_string()))?;
 
         writer.write_all(&encoded)?;
         writer.flush()?;
@@ -410,7 +409,7 @@ mod tests {
         // Create a mock database structure
         fs::create_dir_all(dir.join("sst")).unwrap();
         fs::create_dir_all(dir.join("wal")).unwrap();
-        
+
         fs::write(dir.join("MANIFEST"), b"test manifest").unwrap();
         fs::write(dir.join("sst/L0_001.sst"), b"test sstable data").unwrap();
         fs::write(dir.join("wal/00000001.wal"), b"test wal data").unwrap();
@@ -420,7 +419,7 @@ mod tests {
     fn test_snapshot_manager_new() {
         let dir = tempdir().unwrap();
         create_test_db(dir.path());
-        
+
         let manager = SnapshotManager::new(dir.path()).unwrap();
         assert!(manager.list_snapshots().is_empty());
     }
@@ -429,16 +428,16 @@ mod tests {
     fn test_create_snapshot() {
         let source_dir = tempdir().unwrap();
         let dest_dir = tempdir().unwrap();
-        
+
         create_test_db(source_dir.path());
-        
+
         let mut manager = SnapshotManager::new(source_dir.path()).unwrap();
         let snapshot = manager.create_snapshot(dest_dir.path()).unwrap();
-        
+
         assert!(snapshot.id.starts_with("snap_"));
         assert_eq!(snapshot.snapshot_type, SnapshotType::Full);
         assert!(!snapshot.files.is_empty());
-        
+
         // Verify files were copied
         assert!(dest_dir.path().join("MANIFEST").exists());
         assert!(dest_dir.path().join("sst/L0_001.sst").exists());
@@ -450,15 +449,15 @@ mod tests {
     fn test_load_snapshot() {
         let source_dir = tempdir().unwrap();
         let dest_dir = tempdir().unwrap();
-        
+
         create_test_db(source_dir.path());
-        
+
         let mut manager = SnapshotManager::new(source_dir.path()).unwrap();
         let original = manager.create_snapshot(dest_dir.path()).unwrap();
-        
+
         // Load the snapshot from disk
         let loaded = SnapshotManager::load_snapshot(dest_dir.path()).unwrap();
-        
+
         assert_eq!(loaded.id, original.id);
         assert_eq!(loaded.files.len(), original.files.len());
     }
@@ -468,15 +467,17 @@ mod tests {
         let source_dir = tempdir().unwrap();
         let snapshot_dir = tempdir().unwrap();
         let restore_dir = tempdir().unwrap();
-        
+
         create_test_db(source_dir.path());
-        
+
         let mut manager = SnapshotManager::new(source_dir.path()).unwrap();
         let snapshot = manager.create_snapshot(snapshot_dir.path()).unwrap();
-        
+
         // Restore to new location
-        manager.restore_snapshot(&snapshot, restore_dir.path()).unwrap();
-        
+        manager
+            .restore_snapshot(&snapshot, restore_dir.path())
+            .unwrap();
+
         // Verify files were restored
         assert!(restore_dir.path().join("MANIFEST").exists());
         assert!(restore_dir.path().join("sst/L0_001.sst").exists());
@@ -486,14 +487,14 @@ mod tests {
     fn test_delete_snapshot() {
         let source_dir = tempdir().unwrap();
         let dest_dir = tempdir().unwrap();
-        
+
         create_test_db(source_dir.path());
-        
+
         let mut manager = SnapshotManager::new(source_dir.path()).unwrap();
         let snapshot = manager.create_snapshot(dest_dir.path()).unwrap();
-        
+
         assert_eq!(manager.list_snapshots().len(), 1);
-        
+
         let deleted = manager.delete_snapshot(&snapshot.id).unwrap();
         assert!(deleted);
         assert!(manager.list_snapshots().is_empty());
@@ -502,11 +503,12 @@ mod tests {
     #[test]
     fn test_checksum_verification() {
         let source_dir = tempdir().unwrap();
-        
+
         create_test_db(source_dir.path());
-        
+
         // Compute checksum
-        let checksum = SnapshotManager::compute_checksum(&source_dir.path().join("MANIFEST")).unwrap();
+        let checksum =
+            SnapshotManager::compute_checksum(&source_dir.path().join("MANIFEST")).unwrap();
         assert!(checksum > 0);
     }
 
@@ -514,18 +516,21 @@ mod tests {
     fn test_snapshot_without_wal() {
         let source_dir = tempdir().unwrap();
         let dest_dir = tempdir().unwrap();
-        
+
         create_test_db(source_dir.path());
-        
+
         let config = SnapshotConfig {
             include_wal: false,
             ..Default::default()
         };
-        
+
         let mut manager = SnapshotManager::with_config(source_dir.path(), config).unwrap();
         let snapshot = manager.create_snapshot(dest_dir.path()).unwrap();
-        
+
         // WAL should not be included
-        assert!(!snapshot.files.iter().any(|f| f.relative_path.contains("wal")));
+        assert!(!snapshot
+            .files
+            .iter()
+            .any(|f| f.relative_path.contains("wal")));
     }
 }

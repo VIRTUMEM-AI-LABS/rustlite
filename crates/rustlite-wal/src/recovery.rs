@@ -6,8 +6,8 @@
 // 3. Only returning committed records (incomplete transactions are rolled back)
 // 4. Handling corrupted or truncated records gracefully
 
-use crate::{WalConfig, WalReader, WalRecord};
 use crate::record::RecordPayload;
+use crate::{WalConfig, WalReader, WalRecord};
 use rustlite_core::{Error, Result};
 use std::collections::{HashMap, HashSet};
 
@@ -220,9 +220,7 @@ impl RecoveryManager {
     fn is_recoverable_error(err: &Error) -> bool {
         match err {
             Error::Storage(msg) => msg.contains("CRC mismatch"),
-            Error::Serialization(msg) => {
-                msg.contains("Incomplete") || msg.contains("truncated")
-            }
+            Error::Serialization(msg) => msg.contains("Incomplete") || msg.contains("truncated"),
             _ => false,
         }
     }
@@ -330,8 +328,9 @@ mod tests {
 
         // Write standalone records (no transaction)
         {
-            let mut writer = WalWriter::new(&config.wal_dir, config.max_segment_size, config.sync_mode)
-                .expect("Failed to create writer");
+            let mut writer =
+                WalWriter::new(&config.wal_dir, config.max_segment_size, config.sync_mode)
+                    .expect("Failed to create writer");
 
             for i in 0..5 {
                 let record = WalRecord::put(
@@ -355,17 +354,22 @@ mod tests {
 
         // Write a complete transaction
         {
-            let mut writer = WalWriter::new(&config.wal_dir, config.max_segment_size, config.sync_mode)
-                .expect("Failed to create writer");
+            let mut writer =
+                WalWriter::new(&config.wal_dir, config.max_segment_size, config.sync_mode)
+                    .expect("Failed to create writer");
 
-            writer.append(WalRecord::begin_tx(1)).expect("Failed to append");
+            writer
+                .append(WalRecord::begin_tx(1))
+                .expect("Failed to append");
             writer
                 .append(WalRecord::put(b"key1".to_vec(), b"val1".to_vec()))
                 .expect("Failed to append");
             writer
                 .append(WalRecord::put(b"key2".to_vec(), b"val2".to_vec()))
                 .expect("Failed to append");
-            writer.append(WalRecord::commit_tx(1)).expect("Failed to append");
+            writer
+                .append(WalRecord::commit_tx(1))
+                .expect("Failed to append");
             writer.sync().expect("Failed to sync");
         }
 
@@ -384,10 +388,13 @@ mod tests {
 
         // Write an incomplete transaction (no COMMIT)
         {
-            let mut writer = WalWriter::new(&config.wal_dir, config.max_segment_size, config.sync_mode)
-                .expect("Failed to create writer");
+            let mut writer =
+                WalWriter::new(&config.wal_dir, config.max_segment_size, config.sync_mode)
+                    .expect("Failed to create writer");
 
-            writer.append(WalRecord::begin_tx(1)).expect("Failed to append");
+            writer
+                .append(WalRecord::begin_tx(1))
+                .expect("Failed to append");
             writer
                 .append(WalRecord::put(b"key1".to_vec(), b"val1".to_vec()))
                 .expect("Failed to append");
@@ -411,18 +418,25 @@ mod tests {
 
         // Write one complete and one incomplete transaction
         {
-            let mut writer = WalWriter::new(&config.wal_dir, config.max_segment_size, config.sync_mode)
-                .expect("Failed to create writer");
+            let mut writer =
+                WalWriter::new(&config.wal_dir, config.max_segment_size, config.sync_mode)
+                    .expect("Failed to create writer");
 
             // Transaction 1: Complete
-            writer.append(WalRecord::begin_tx(1)).expect("Failed to append");
+            writer
+                .append(WalRecord::begin_tx(1))
+                .expect("Failed to append");
             writer
                 .append(WalRecord::put(b"key1".to_vec(), b"val1".to_vec()))
                 .expect("Failed to append");
-            writer.append(WalRecord::commit_tx(1)).expect("Failed to append");
+            writer
+                .append(WalRecord::commit_tx(1))
+                .expect("Failed to append");
 
             // Transaction 2: Incomplete
-            writer.append(WalRecord::begin_tx(2)).expect("Failed to append");
+            writer
+                .append(WalRecord::begin_tx(2))
+                .expect("Failed to append");
             writer
                 .append(WalRecord::put(b"key2".to_vec(), b"val2".to_vec()))
                 .expect("Failed to append");
@@ -443,14 +457,19 @@ mod tests {
 
         // Write a complete transaction
         {
-            let mut writer = WalWriter::new(&config.wal_dir, config.max_segment_size, config.sync_mode)
-                .expect("Failed to create writer");
+            let mut writer =
+                WalWriter::new(&config.wal_dir, config.max_segment_size, config.sync_mode)
+                    .expect("Failed to create writer");
 
-            writer.append(WalRecord::begin_tx(1)).expect("Failed to append");
+            writer
+                .append(WalRecord::begin_tx(1))
+                .expect("Failed to append");
             writer
                 .append(WalRecord::put(b"key1".to_vec(), b"val1".to_vec()))
                 .expect("Failed to append");
-            writer.append(WalRecord::commit_tx(1)).expect("Failed to append");
+            writer
+                .append(WalRecord::commit_tx(1))
+                .expect("Failed to append");
             writer.sync().expect("Failed to sync");
         }
 
@@ -470,18 +489,25 @@ mod tests {
 
         // Write various records
         {
-            let mut writer = WalWriter::new(&config.wal_dir, config.max_segment_size, config.sync_mode)
-                .expect("Failed to create writer");
+            let mut writer =
+                WalWriter::new(&config.wal_dir, config.max_segment_size, config.sync_mode)
+                    .expect("Failed to create writer");
 
             // Complete transaction
-            writer.append(WalRecord::begin_tx(1)).expect("Failed to append");
+            writer
+                .append(WalRecord::begin_tx(1))
+                .expect("Failed to append");
             writer
                 .append(WalRecord::put(b"k1".to_vec(), b"v1".to_vec()))
                 .expect("Failed to append");
-            writer.append(WalRecord::commit_tx(1)).expect("Failed to append");
+            writer
+                .append(WalRecord::commit_tx(1))
+                .expect("Failed to append");
 
             // Incomplete transaction
-            writer.append(WalRecord::begin_tx(2)).expect("Failed to append");
+            writer
+                .append(WalRecord::begin_tx(2))
+                .expect("Failed to append");
             writer
                 .append(WalRecord::delete(b"k2".to_vec()))
                 .expect("Failed to append");

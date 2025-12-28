@@ -53,11 +53,7 @@ impl WalReader {
             .map_err(|e| Error::Storage(format!("Failed to read WAL directory: {}", e)))?
             .filter_map(|entry| entry.ok())
             .map(|entry| entry.path())
-            .filter(|path| {
-                path.extension()
-                    .map(|ext| ext == "log")
-                    .unwrap_or(false)
-            })
+            .filter(|path| path.extension().map(|ext| ext == "log").unwrap_or(false))
             .collect();
 
         // Sort segments by filename (which contains sequence number)
@@ -149,7 +145,10 @@ impl WalReader {
                 return Ok(None); // End of file
             }
             Err(e) => {
-                return Err(Error::Storage(format!("Failed to read record length: {}", e)));
+                return Err(Error::Storage(format!(
+                    "Failed to read record length: {}",
+                    e
+                )));
             }
         }
 
@@ -279,8 +278,8 @@ mod tests {
 
         // Write a record
         {
-            let mut writer =
-                WalWriter::new(&wal_path, 64 * 1024 * 1024, SyncMode::Sync).expect("Failed to create writer");
+            let mut writer = WalWriter::new(&wal_path, 64 * 1024 * 1024, SyncMode::Sync)
+                .expect("Failed to create writer");
             let record = WalRecord::put(b"key1".to_vec(), b"value1".to_vec());
             writer.append(record).expect("Failed to append");
             writer.sync().expect("Failed to sync");
@@ -308,8 +307,8 @@ mod tests {
 
         // Write multiple records
         {
-            let mut writer =
-                WalWriter::new(&wal_path, 64 * 1024 * 1024, SyncMode::Sync).expect("Failed to create writer");
+            let mut writer = WalWriter::new(&wal_path, 64 * 1024 * 1024, SyncMode::Sync)
+                .expect("Failed to create writer");
 
             for i in 0..10 {
                 let record = WalRecord::put(
@@ -362,8 +361,8 @@ mod tests {
 
         // Write some records
         {
-            let mut writer =
-                WalWriter::new(&wal_path, 64 * 1024 * 1024, SyncMode::Sync).expect("Failed to create writer");
+            let mut writer = WalWriter::new(&wal_path, 64 * 1024 * 1024, SyncMode::Sync)
+                .expect("Failed to create writer");
 
             for i in 0..5 {
                 let record = WalRecord::put(
@@ -393,17 +392,21 @@ mod tests {
 
         // Write transaction sequence
         {
-            let mut writer =
-                WalWriter::new(&wal_path, 64 * 1024 * 1024, SyncMode::Sync).expect("Failed to create writer");
+            let mut writer = WalWriter::new(&wal_path, 64 * 1024 * 1024, SyncMode::Sync)
+                .expect("Failed to create writer");
 
-            writer.append(WalRecord::begin_tx(1)).expect("Failed to append");
+            writer
+                .append(WalRecord::begin_tx(1))
+                .expect("Failed to append");
             writer
                 .append(WalRecord::put(b"key1".to_vec(), b"val1".to_vec()))
                 .expect("Failed to append");
             writer
                 .append(WalRecord::put(b"key2".to_vec(), b"val2".to_vec()))
                 .expect("Failed to append");
-            writer.append(WalRecord::commit_tx(1)).expect("Failed to append");
+            writer
+                .append(WalRecord::commit_tx(1))
+                .expect("Failed to append");
             writer.sync().expect("Failed to sync");
         }
 

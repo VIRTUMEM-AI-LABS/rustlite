@@ -23,7 +23,7 @@ use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
 /// Magic number for SSTable files
-const SSTABLE_MAGIC: u64 = 0x535354_424C_4954; // "SSTBLIT" in hex-ish
+const SSTABLE_MAGIC: u64 = 0x53_53_54_42_4C_49_54; // "SSTBLIT" in hex-ish
 
 /// Default block size (4KB)
 const DEFAULT_BLOCK_SIZE: usize = 4096;
@@ -173,28 +173,28 @@ impl SSTableWriter {
             self.min_key = Some(entry.key.clone());
         }
         self.max_key = Some(entry.key.clone());
-        
+
         // Track first key of block
         if self.current_block_first_key.is_none() {
             self.current_block_first_key = Some(entry.key.clone());
         }
-        
+
         // Serialize entry
-        let encoded = bincode::serialize(&entry)
-            .map_err(|e| Error::Serialization(e.to_string()))?;
-        
+        let encoded =
+            bincode::serialize(&entry).map_err(|e| Error::Serialization(e.to_string()))?;
+
         // Write length prefix + entry
         let len = encoded.len() as u32;
         self.block_buffer.extend_from_slice(&len.to_le_bytes());
         self.block_buffer.extend_from_slice(&encoded);
-        
+
         self.entry_count += 1;
-        
+
         // Flush block if it exceeds threshold
         if self.block_buffer.len() >= self.block_size {
             self.flush_block()?;
         }
-        
+
         Ok(())
     }
 
@@ -203,10 +203,10 @@ impl SSTableWriter {
         if self.block_buffer.is_empty() {
             return Ok(());
         }
-        
+
         // Calculate CRC
         let crc = crc32fast::hash(&self.block_buffer);
-        
+
         // Create index entry
         if let Some(first_key) = self.current_block_first_key.take() {
             self.index.push(IndexEntry {
@@ -233,11 +233,11 @@ impl SSTableWriter {
     pub fn finish(mut self) -> Result<SSTableMeta> {
         // Flush any remaining data
         self.flush_block()?;
-        
+
         // Write index block
         let index_offset = self.position;
-        let index_encoded = bincode::serialize(&self.index)
-            .map_err(|e| Error::Serialization(e.to_string()))?;
+        let index_encoded =
+            bincode::serialize(&self.index).map_err(|e| Error::Serialization(e.to_string()))?;
         let index_size = index_encoded.len() as u32;
 
         self.writer.write_all(&index_encoded)?;
@@ -246,7 +246,7 @@ impl SSTableWriter {
         // Write footer
         let min_key = self.min_key.clone().unwrap_or_default();
         let max_key = self.max_key.clone().unwrap_or_default();
-        
+
         let footer_data = SSTableFooter {
             index_offset,
             index_size,
@@ -256,18 +256,18 @@ impl SSTableWriter {
             magic: SSTABLE_MAGIC,
             crc: 0, // Will be set after computing CRC
         };
-        
-        let footer_encoded = bincode::serialize(&footer_data)
-            .map_err(|e| Error::Serialization(e.to_string()))?;
+
+        let footer_encoded =
+            bincode::serialize(&footer_data).map_err(|e| Error::Serialization(e.to_string()))?;
         let footer_crc = crc32fast::hash(&footer_encoded);
-        
+
         // Write footer with correct CRC
         let final_footer = SSTableFooter {
             crc: footer_crc,
             ..footer_data
         };
-        let final_footer_encoded = bincode::serialize(&final_footer)
-            .map_err(|e| Error::Serialization(e.to_string()))?;
+        let final_footer_encoded =
+            bincode::serialize(&final_footer).map_err(|e| Error::Serialization(e.to_string()))?;
 
         // Write footer length + footer
         let footer_len = final_footer_encoded.len() as u32;
@@ -277,7 +277,7 @@ impl SSTableWriter {
         self.writer.flush()?;
 
         let file_size = self.position + final_footer_encoded.len() as u64 + 4;
-        
+
         Ok(SSTableMeta {
             path: self.path,
             min_key,
@@ -295,7 +295,7 @@ impl SSTableWriter {
         I: Iterator<Item = (Vec<u8>, MemtableEntry)>,
     {
         let mut writer = SSTableWriter::new(path)?;
-        
+
         for (key, entry) in iter {
             let sstable_entry = match entry {
                 MemtableEntry::Value(v) => SSTableEntry::value(key, v),
@@ -303,7 +303,7 @@ impl SSTableWriter {
             };
             writer.add(sstable_entry)?;
         }
-        
+
         writer.finish()
     }
 }
@@ -346,8 +346,8 @@ impl SSTableReader {
         let mut footer_buf = vec![0u8; footer_len as usize];
         file.read_exact(&mut footer_buf)?;
 
-        let footer: SSTableFooter = bincode::deserialize(&footer_buf)
-            .map_err(|e| Error::Serialization(e.to_string()))?;
+        let footer: SSTableFooter =
+            bincode::deserialize(&footer_buf).map_err(|e| Error::Serialization(e.to_string()))?;
 
         // Validate magic number
         if footer.magic != SSTABLE_MAGIC {
@@ -359,8 +359,8 @@ impl SSTableReader {
         let mut index_buf = vec![0u8; footer.index_size as usize];
         file.read_exact(&mut index_buf)?;
 
-        let index: Vec<IndexEntry> = bincode::deserialize(&index_buf)
-            .map_err(|e| Error::Serialization(e.to_string()))?;
+        let index: Vec<IndexEntry> =
+            bincode::deserialize(&index_buf).map_err(|e| Error::Serialization(e.to_string()))?;
 
         Ok(Self {
             path,
@@ -374,8 +374,10 @@ impl SSTableReader {
     /// Get a value by key
     pub fn get(&mut self, key: &[u8]) -> Result<Option<SSTableEntry>> {
         // Binary search to find the block that might contain the key
-        let block_idx = self.index.partition_point(|entry| entry.first_key.as_slice() <= key);
-        
+        let block_idx = self
+            .index
+            .partition_point(|entry| entry.first_key.as_slice() <= key);
+
         // The key would be in the previous block (if any)
         if block_idx == 0 {
             // Key is smaller than all keys in the SSTable
@@ -383,17 +385,17 @@ impl SSTableReader {
                 return Ok(None);
             }
         }
-        
+
         // Check the block
         let block_idx = if block_idx > 0 { block_idx - 1 } else { 0 };
-        
+
         if block_idx >= self.index.len() {
             return Ok(None);
         }
-        
+
         // Read and search the block
         let block = self.read_block(block_idx)?;
-        
+
         for entry in block {
             if entry.key.as_slice() == key {
                 return Ok(Some(entry));
@@ -402,7 +404,7 @@ impl SSTableReader {
                 break;
             }
         }
-        
+
         Ok(None)
     }
 
@@ -425,16 +427,16 @@ impl SSTableReader {
         if stored_crc != computed_crc {
             return Err(Error::Corruption("Block CRC mismatch".into()));
         }
-        
+
         // Parse entries from block
         let mut entries = Vec::new();
         let mut offset = 0;
-        
+
         while offset < data_buf.len() {
             if offset + 4 > data_buf.len() {
                 break;
             }
-            
+
             let len = u32::from_le_bytes([
                 data_buf[offset],
                 data_buf[offset + 1],
@@ -442,17 +444,17 @@ impl SSTableReader {
                 data_buf[offset + 3],
             ]) as usize;
             offset += 4;
-            
+
             if offset + len > data_buf.len() {
                 break;
             }
-            
+
             let entry: SSTableEntry = bincode::deserialize(&data_buf[offset..offset + len])
                 .map_err(|e| Error::Serialization(e.to_string()))?;
             entries.push(entry);
             offset += len;
         }
-        
+
         Ok(entries)
     }
 
@@ -493,7 +495,7 @@ pub struct SSTableIterator<'a> {
     entry_idx: usize,
 }
 
-impl<'a> SSTableIterator<'a> {
+impl SSTableIterator<'_> {
     /// Get the next entry
     pub fn next_entry(&mut self) -> Result<Option<SSTableEntry>> {
         loop {
@@ -503,12 +505,12 @@ impl<'a> SSTableIterator<'a> {
                 self.entry_idx += 1;
                 return Ok(Some(entry));
             }
-            
+
             // Load the next block
             if self.block_idx >= self.reader.index.len() {
                 return Ok(None);
             }
-            
+
             self.block_entries = self.reader.read_block(self.block_idx)?;
             self.block_idx += 1;
             self.entry_idx = 0;
@@ -531,30 +533,36 @@ mod tests {
     fn test_sstable_write_read() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("test.sst");
-        
+
         // Write SSTable
         let mut writer = SSTableWriter::new(&path).unwrap();
-        writer.add(SSTableEntry::value(b"a".to_vec(), b"1".to_vec())).unwrap();
-        writer.add(SSTableEntry::value(b"b".to_vec(), b"2".to_vec())).unwrap();
-        writer.add(SSTableEntry::value(b"c".to_vec(), b"3".to_vec())).unwrap();
+        writer
+            .add(SSTableEntry::value(b"a".to_vec(), b"1".to_vec()))
+            .unwrap();
+        writer
+            .add(SSTableEntry::value(b"b".to_vec(), b"2".to_vec()))
+            .unwrap();
+        writer
+            .add(SSTableEntry::value(b"c".to_vec(), b"3".to_vec()))
+            .unwrap();
         let meta = writer.finish().unwrap();
-        
+
         assert_eq!(meta.entry_count, 3);
         assert_eq!(meta.min_key, b"a".to_vec());
         assert_eq!(meta.max_key, b"c".to_vec());
-        
+
         // Read SSTable
         let mut reader = SSTableReader::open(&path).unwrap();
-        
+
         let entry = reader.get(b"a").unwrap().unwrap();
         assert_eq!(entry.value, b"1".to_vec());
-        
+
         let entry = reader.get(b"b").unwrap().unwrap();
         assert_eq!(entry.value, b"2".to_vec());
-        
+
         let entry = reader.get(b"c").unwrap().unwrap();
         assert_eq!(entry.value, b"3".to_vec());
-        
+
         assert!(reader.get(b"d").unwrap().is_none());
     }
 
@@ -586,42 +594,44 @@ mod tests {
     fn test_sstable_iterator() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("test.sst");
-        
+
         let mut writer = SSTableWriter::new(&path).unwrap();
         for i in 0..100 {
             let key = format!("key{:03}", i);
             let value = format!("value{}", i);
-            writer.add(SSTableEntry::value(key.into_bytes(), value.into_bytes())).unwrap();
+            writer
+                .add(SSTableEntry::value(key.into_bytes(), value.into_bytes()))
+                .unwrap();
         }
         writer.finish().unwrap();
-        
+
         let mut reader = SSTableReader::open(&path).unwrap();
         let mut iter = reader.iter().unwrap();
-        
+
         let mut count = 0;
         while let Some(_entry) = iter.next_entry().unwrap() {
             count += 1;
         }
-        
+
         assert_eq!(count, 100);
     }
 
     #[test]
     fn test_sstable_from_memtable() {
         use crate::memtable::Memtable;
-        
+
         let dir = tempdir().unwrap();
         let path = dir.path().join("test.sst");
-        
+
         let mut mt = Memtable::new();
         mt.put(b"a".to_vec(), b"1".to_vec());
         mt.put(b"b".to_vec(), b"2".to_vec());
         mt.delete(b"c".to_vec());
-        
-        let meta = SSTableWriter::from_memtable(&path, mt.into_iter()).unwrap();
-        
+
+        let meta = SSTableWriter::from_memtable(&path, mt.drain()).unwrap();
+
         assert_eq!(meta.entry_count, 3);
-        
+
         let mut reader = SSTableReader::open(&path).unwrap();
         assert_eq!(reader.get(b"a").unwrap().unwrap().value, b"1".to_vec());
         assert!(reader.get(b"c").unwrap().unwrap().is_tombstone());
@@ -631,18 +641,22 @@ mod tests {
     fn test_sstable_might_contain() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("test.sst");
-        
+
         let mut writer = SSTableWriter::new(&path).unwrap();
-        writer.add(SSTableEntry::value(b"b".to_vec(), b"2".to_vec())).unwrap();
-        writer.add(SSTableEntry::value(b"d".to_vec(), b"4".to_vec())).unwrap();
+        writer
+            .add(SSTableEntry::value(b"b".to_vec(), b"2".to_vec()))
+            .unwrap();
+        writer
+            .add(SSTableEntry::value(b"d".to_vec(), b"4".to_vec()))
+            .unwrap();
         writer.finish().unwrap();
-        
+
         let reader = SSTableReader::open(&path).unwrap();
-        
+
         assert!(!reader.might_contain(b"a")); // Before range
-        assert!(reader.might_contain(b"b"));  // In range
-        assert!(reader.might_contain(b"c"));  // In range (might be there)
-        assert!(reader.might_contain(b"d"));  // In range
+        assert!(reader.might_contain(b"b")); // In range
+        assert!(reader.might_contain(b"c")); // In range (might be there)
+        assert!(reader.might_contain(b"d")); // In range
         assert!(!reader.might_contain(b"e")); // After range
     }
 }

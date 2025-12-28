@@ -92,10 +92,10 @@ impl SnapshotChain {
 
         // Each incremental must reference the previous
         for i in 1..self.snapshots.len() {
-            if self.snapshots[i].snapshot_type == SnapshotType::Incremental {
-                if self.snapshots[i].parent_id.as_ref() != Some(&self.snapshots[i - 1].id) {
-                    return false;
-                }
+            if self.snapshots[i].snapshot_type == SnapshotType::Incremental
+                && self.snapshots[i].parent_id.as_ref() != Some(&self.snapshots[i - 1].id)
+            {
+                return false;
             }
         }
 

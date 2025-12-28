@@ -23,6 +23,9 @@ pub enum Error {
     /// Invalid operation
     InvalidOperation(String),
 
+    /// Invalid input (e.g., invalid SQL query)
+    InvalidInput(String),
+
     /// Not found
     NotFound,
 
@@ -39,6 +42,7 @@ impl fmt::Display for Error {
             Error::Storage(msg) => write!(f, "Storage error: {}", msg),
             Error::Transaction(msg) => write!(f, "Transaction error: {}", msg),
             Error::InvalidOperation(msg) => write!(f, "Invalid operation: {}", msg),
+            Error::InvalidInput(msg) => write!(f, "Invalid input: {}", msg),
             Error::NotFound => write!(f, "Not found"),
             Error::Corruption(msg) => write!(f, "Data corruption: {}", msg),
         }

@@ -68,11 +68,13 @@ impl Memtable {
         // Remove old entry size if exists
         if let Some(old) = self.data.get(&key) {
             let old_size = old.size() as u64;
-            self.size_bytes.fetch_sub(key_size + old_size, Ordering::Relaxed);
+            self.size_bytes
+                .fetch_sub(key_size + old_size, Ordering::Relaxed);
         }
 
         self.data.insert(key.clone(), MemtableEntry::Value(value));
-        self.size_bytes.fetch_add(key_size + value_size, Ordering::Relaxed);
+        self.size_bytes
+            .fetch_add(key_size + value_size, Ordering::Relaxed);
         self.sequence.fetch_add(1, Ordering::Relaxed);
     }
 
@@ -96,7 +98,8 @@ impl Memtable {
         // Remove old entry size if exists
         if let Some(old) = self.data.get(&key) {
             let old_size = old.size() as u64;
-            self.size_bytes.fetch_sub(key_size + old_size, Ordering::Relaxed);
+            self.size_bytes
+                .fetch_sub(key_size + old_size, Ordering::Relaxed);
         }
 
         self.data.insert(key.clone(), MemtableEntry::Tombstone);
@@ -144,7 +147,7 @@ impl Memtable {
     }
 
     /// Consumes the memtable and returns all entries sorted by key
-    pub fn into_iter(self) -> impl Iterator<Item = (Vec<u8>, MemtableEntry)> {
+    pub fn drain(self) -> impl Iterator<Item = (Vec<u8>, MemtableEntry)> {
         self.data.into_iter()
     }
 }
@@ -170,10 +173,10 @@ mod tests {
     #[test]
     fn test_memtable_put_get() {
         let mut mt = Memtable::new();
-        
+
         mt.put(b"key1".to_vec(), b"value1".to_vec());
         mt.put(b"key2".to_vec(), b"value2".to_vec());
-        
+
         assert_eq!(mt.len(), 2);
         assert_eq!(mt.get(b"key1"), Some(Some(b"value1".as_slice())));
         assert_eq!(mt.get(b"key2"), Some(Some(b"value2".as_slice())));
@@ -183,10 +186,10 @@ mod tests {
     #[test]
     fn test_memtable_update() {
         let mut mt = Memtable::new();
-        
+
         mt.put(b"key".to_vec(), b"value1".to_vec());
         assert_eq!(mt.get(b"key"), Some(Some(b"value1".as_slice())));
-        
+
         mt.put(b"key".to_vec(), b"value2".to_vec());
         assert_eq!(mt.get(b"key"), Some(Some(b"value2".as_slice())));
         assert_eq!(mt.len(), 1);
@@ -195,10 +198,10 @@ mod tests {
     #[test]
     fn test_memtable_delete() {
         let mut mt = Memtable::new();
-        
+
         mt.put(b"key".to_vec(), b"value".to_vec());
         assert_eq!(mt.get(b"key"), Some(Some(b"value".as_slice())));
-        
+
         mt.delete(b"key".to_vec());
         // Key exists but is a tombstone
         assert_eq!(mt.get(b"key"), Some(None));
@@ -208,10 +211,10 @@ mod tests {
     #[test]
     fn test_memtable_size_tracking() {
         let mut mt = Memtable::new();
-        
+
         let initial_size = mt.size_bytes();
         mt.put(b"key".to_vec(), b"value".to_vec());
-        
+
         // Size should have increased
         assert!(mt.size_bytes() > initial_size);
     }
@@ -219,12 +222,12 @@ mod tests {
     #[test]
     fn test_memtable_iter_sorted() {
         let mut mt = Memtable::new();
-        
+
         // Insert in random order
         mt.put(b"c".to_vec(), b"3".to_vec());
         mt.put(b"a".to_vec(), b"1".to_vec());
         mt.put(b"b".to_vec(), b"2".to_vec());
-        
+
         // Iteration should be sorted
         let keys: Vec<_> = mt.iter().map(|(k, _)| k.clone()).collect();
         assert_eq!(keys, vec![b"a".to_vec(), b"b".to_vec(), b"c".to_vec()]);
@@ -234,10 +237,10 @@ mod tests {
     fn test_memtable_sequence() {
         let mut mt = Memtable::with_sequence(100);
         assert_eq!(mt.sequence(), 100);
-        
+
         mt.put(b"key".to_vec(), b"value".to_vec());
         assert_eq!(mt.sequence(), 101);
-        
+
         mt.delete(b"key".to_vec());
         assert_eq!(mt.sequence(), 102);
     }
@@ -245,14 +248,14 @@ mod tests {
     #[test]
     fn test_memtable_clear() {
         let mut mt = Memtable::new();
-        
+
         mt.put(b"key1".to_vec(), b"value1".to_vec());
         mt.put(b"key2".to_vec(), b"value2".to_vec());
-        
+
         assert_eq!(mt.len(), 2);
-        
+
         mt.clear();
-        
+
         assert!(mt.is_empty());
         assert_eq!(mt.size_bytes(), 0);
     }

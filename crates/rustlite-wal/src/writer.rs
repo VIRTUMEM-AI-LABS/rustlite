@@ -37,10 +37,7 @@ impl WalWriter {
             .map_err(|e| Error::Storage(format!("Failed to open WAL segment: {}", e)))?;
 
         // Get current file size for rotation tracking
-        let current_size = file
-            .metadata()
-            .map(|m| m.len())
-            .unwrap_or(0);
+        let current_size = file.metadata().map(|m| m.len()).unwrap_or(0);
 
         Ok(Self {
             file: BufWriter::new(file),
@@ -62,7 +59,10 @@ impl WalWriter {
                 if let Some(name) = entry.file_name().to_str() {
                     if name.starts_with("wal-") && name.ends_with(".log") {
                         // Parse sequence from filename: wal-{seq}.log
-                        if let Some(seq_str) = name.strip_prefix("wal-").and_then(|s| s.strip_suffix(".log")) {
+                        if let Some(seq_str) = name
+                            .strip_prefix("wal-")
+                            .and_then(|s| s.strip_suffix(".log"))
+                        {
                             if let Ok(seq) = u64::from_str_radix(seq_str, 16) {
                                 max_seq = max_seq.max(seq);
                             }
@@ -219,8 +219,8 @@ mod tests {
         let (_temp_dir, wal_path) = setup_test_wal();
 
         // Use small segment size to force rotation
-        let mut writer = WalWriter::new(&wal_path, 100, SyncMode::Sync)
-            .expect("Failed to create writer");
+        let mut writer =
+            WalWriter::new(&wal_path, 100, SyncMode::Sync).expect("Failed to create writer");
 
         let initial_segment = writer.current_segment_path().clone();
 
@@ -240,10 +240,18 @@ mod tests {
         let segments: Vec<_> = std::fs::read_dir(&wal_path)
             .expect("Failed to read dir")
             .filter_map(|e| e.ok())
-            .filter(|e| e.path().extension().map(|ext| ext == "log").unwrap_or(false))
+            .filter(|e| {
+                e.path()
+                    .extension()
+                    .map(|ext| ext == "log")
+                    .unwrap_or(false)
+            })
             .collect();
 
-        assert!(segments.len() > 1, "Expected multiple segments after rotation");
+        assert!(
+            segments.len() > 1,
+            "Expected multiple segments after rotation"
+        );
     }
 
     #[test]
@@ -333,7 +341,9 @@ mod tests {
         let large_value = vec![0u8; 1024 * 1024];
         let record = WalRecord::put(b"large_key".to_vec(), large_value);
 
-        writer.append(record).expect("Failed to append large record");
+        writer
+            .append(record)
+            .expect("Failed to append large record");
 
         assert!(writer.current_segment_size() > 1024 * 1024);
     }
