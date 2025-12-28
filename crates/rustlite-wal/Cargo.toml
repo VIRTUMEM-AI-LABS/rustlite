@@ -9,7 +9,7 @@ rust-version.workspace = true
 description = "Write-Ahead Log (WAL) implementation for RustLite"
 
 [dependencies]
-rustlite-core = { path = "../rustlite-core" }
+rustlite-core = { path = "../rustlite-core", version = "0.1.0" }
 crc32fast.workspace = true
 bincode.workspace = true
 serde.workspace = true
