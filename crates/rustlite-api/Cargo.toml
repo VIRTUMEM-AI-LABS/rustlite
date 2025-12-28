@@ -25,13 +25,14 @@ include = [
 ]
 
 [dependencies]
-rustlite-core = { path = "../rustlite-core", version = "0.1.0" }
-rustlite-wal = { path = "../rustlite-wal", version = "0.1.0" }
-rustlite-storage = { path = "../rustlite-storage", version = "0.1.0" }
-rustlite-snapshot = { path = "../rustlite-snapshot", version = "0.1.0" }
+rustlite-core = { path = "../rustlite-core", version = "0.2.1" }
+rustlite-wal = { path = "../rustlite-wal", version = "0.2.1" }
+rustlite-storage = { path = "../rustlite-storage", version = "0.2.1" }
+rustlite-snapshot = { path = "../rustlite-snapshot", version = "0.2.1" }
 
 [dev-dependencies]
 criterion.workspace = true
+tempfile.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true

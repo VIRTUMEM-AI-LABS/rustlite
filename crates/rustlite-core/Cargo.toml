@@ -8,7 +8,9 @@ repository.workspace = true
 homepage.workspace = true
 documentation.workspace = true
 rust-version.workspace = true
-description = "Core types and traits for RustLite embedded database"
+description = "Core types and traits for RustLite embedded database (internal implementation detail)"
+keywords = ["database", "embedded", "storage", "internal"]
+categories = ["database"]
 
 [dependencies]
 # Core dependencies will be added as development progresses

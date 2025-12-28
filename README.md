@@ -25,13 +25,15 @@ RustLite aims to be the go-to embedded database for Rust applications, combining
 
 ## ✨ Features
 
-### Current (v0.1.0)
-- ✅ In-memory key-value store
+### Current (v0.2.0)
+- ✅ **Persistent storage** with LSM-tree architecture
+- ✅ **Write-Ahead Logging (WAL)** for crash recovery
+- ✅ **SSTable compaction** for optimized disk usage
+- ✅ **Snapshot backups** for point-in-time recovery
 - ✅ Thread-safe concurrent access
 - ✅ Simple, ergonomic API
 
 ### Roadmap
-- 🔄 **v0.2**: Persistent storage with Write-Ahead Logging (WAL)
 - 🔄 **v0.3**: B-Tree and Hash indexing
 - 🔄 **v0.4**: SQL-like query engine
 - 🔄 **v0.5**: Full transaction support with MVCC
@@ -45,19 +47,19 @@ Add RustLite to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rustlite = "0.1.0"
+rustlite = "0.2.0"
 ```
 
-### Basic Usage
+### Persistent Database (Recommended)
 
 ```rust
 use rustlite::Database;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Create a new database
-    let db = Database::new()?;
+    // Open a persistent database (creates directory if needed)
+    let db = Database::open("./my_database")?;
     
-    // Insert data
+    // Insert data - automatically persisted to disk
     db.put(b"user:1:name", b"Alice")?;
     db.put(b"user:1:email", b"alice@example.com")?;
     
@@ -69,8 +71,36 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Delete data
     db.delete(b"user:1:email")?;
     
+    // Force sync to disk (optional - data is already durable via WAL)
+    db.sync()?;
+    
     Ok(())
 }
+```
+
+### Data Persists Across Restarts
+
+```rust
+use rustlite::Database;
+
+// First run - write data
+let db = Database::open("./my_database")?;
+db.put(b"counter", b"42")?;
+drop(db);
+
+// Later - data is still there!
+let db = Database::open("./my_database")?;
+assert_eq!(db.get(b"counter")?, Some(b"42".to_vec()));
+```
+
+### In-Memory Database (For Testing)
+
+```rust
+use rustlite::Database;
+
+// Fast in-memory storage (data lost when program exits)
+let db = Database::in_memory()?;
+db.put(b"temp", b"data")?;
 ```
 
 ## 📦 Installation
@@ -91,13 +121,29 @@ cargo build --release
 
 ## 🏗️ Architecture
 
-RustLite is built with a modular architecture:
+RustLite is built with a modular LSM-tree architecture:
 
-- **Storage Engine**: Pluggable backends (LSM-tree, B-Tree)
-- **Transaction Layer**: MVCC-based isolation
-- **Query Engine**: SQL-like query compilation and execution
-- **WAL**: Write-ahead logging for durability
-- **Index System**: Multiple index types for efficient queries
+```
+┌──────────────────────────────────────────────────────────┐
+│                      Database API                        │
+│                   (rustlite crate)                       │
+├──────────────────────────────────────────────────────────┤
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐   │
+│  │   Memtable  │  │     WAL     │  │    Snapshot     │   │
+│  │  (BTreeMap) │  │ (Write Log) │  │   (Backups)     │   │
+│  └─────────────┘  └─────────────┘  └─────────────────┘   │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │              SSTable Storage                        │ │
+│  │    (Sorted String Tables + Compaction)              │ │
+│  └─────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────┘
+```
+
+- **Memtable**: In-memory sorted buffer for fast writes
+- **WAL**: Write-ahead log for crash recovery
+- **SSTable**: Immutable on-disk sorted files
+- **Compaction**: Background merging to reclaim space
+- **Snapshot**: Point-in-time backups
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for technical details and [docs/README.md](docs/README.md) for the full documentation index.
 

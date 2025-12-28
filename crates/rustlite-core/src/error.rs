@@ -25,6 +25,9 @@ pub enum Error {
 
     /// Not found
     NotFound,
+
+    /// Data corruption detected
+    Corruption(String),
 }
 
 impl fmt::Display for Error {
@@ -37,6 +40,7 @@ impl fmt::Display for Error {
             Error::Transaction(msg) => write!(f, "Transaction error: {}", msg),
             Error::InvalidOperation(msg) => write!(f, "Invalid operation: {}", msg),
             Error::NotFound => write!(f, "Not found"),
+            Error::Corruption(msg) => write!(f, "Data corruption: {}", msg),
         }
     }
 }

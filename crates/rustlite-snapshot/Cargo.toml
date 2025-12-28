@@ -5,12 +5,20 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
 rust-version.workspace = true
-description = "Snapshot and backup functionality for RustLite"
+description = "Snapshot and backup functionality for RustLite (internal implementation detail)"
+keywords = ["database", "backup", "snapshot", "internal"]
+categories = ["database"]
 
 [dependencies]
-rustlite-core = { path = "../rustlite-core" }
-rustlite-storage = { path = "../rustlite-storage" }
+rustlite-core = { path = "../rustlite-core", version = "0.2.1" }
+rustlite-storage = { path = "../rustlite-storage", version = "0.2.1" }
+serde.workspace = true
+bincode.workspace = true
+crc32fast.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true
+tempfile.workspace = true

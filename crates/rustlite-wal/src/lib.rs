@@ -1,3 +1,22 @@
+//! # RustLite WAL (Write-Ahead Log)
+//!
+//! Write-Ahead Log implementation for RustLite, providing durable,
+//! crash-recoverable transaction logging.
+//!
+//! ## ⚠️ Internal Implementation Detail
+//!
+//! **This crate is an internal implementation detail of RustLite.**
+//! 
+//! Users should depend on the main [`rustlite`](https://crates.io/crates/rustlite) crate
+//! instead, which provides the stable public API. This crate's API may change
+//! without notice between minor versions.
+//!
+//! ```toml
+//! # In your Cargo.toml - use the main crate, not this one:
+//! [dependencies]
+//! rustlite = "0.2"
+//! ```
+
 // Write-Ahead Log (WAL) implementation for RustLite
 // Provides durable, crash-recoverable transaction logging
 

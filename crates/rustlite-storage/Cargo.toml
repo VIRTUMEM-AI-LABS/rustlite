@@ -5,12 +5,20 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
 rust-version.workspace = true
-description = "Storage engine (LSM, SSTable, compaction) for RustLite"
+description = "Storage engine (LSM-tree, SSTable, compaction) for RustLite (internal implementation detail)"
+keywords = ["database", "lsm-tree", "storage", "internal"]
+categories = ["database"]
 
 [dependencies]
-rustlite-core = { path = "../rustlite-core" }
-rustlite-wal = { path = "../rustlite-wal" }
+rustlite-core = { path = "../rustlite-core", version = "0.2.1" }
+rustlite-wal = { path = "../rustlite-wal", version = "0.2.1" }
+crc32fast.workspace = true
+bincode.workspace = true
+serde.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true
+tempfile.workspace = true
