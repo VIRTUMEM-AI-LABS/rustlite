@@ -25,16 +25,17 @@ RustLite aims to be the go-to embedded database for Rust applications, combining
 
 ## ✨ Features
 
-### Current (v0.2.0)
+### Current (v0.3.0)
 - ✅ **Persistent storage** with LSM-tree architecture
 - ✅ **Write-Ahead Logging (WAL)** for crash recovery
 - ✅ **SSTable compaction** for optimized disk usage
 - ✅ **Snapshot backups** for point-in-time recovery
+- ✅ **B-Tree indexing** for range queries and ordered lookups
+- ✅ **Hash indexing** for O(1) exact-match lookups
 - ✅ Thread-safe concurrent access
 - ✅ Simple, ergonomic API
 
 ### Roadmap
-- 🔄 **v0.3**: B-Tree and Hash indexing
 - 🔄 **v0.4**: SQL-like query engine
 - 🔄 **v0.5**: Full transaction support with MVCC
 - 🔄 **v1.0**: Production-ready with ACID guarantees
@@ -47,7 +48,7 @@ Add RustLite to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rustlite = "0.2.0"
+rustlite = "0.3"
 ```
 
 ### Persistent Database (Recommended)
@@ -103,6 +104,35 @@ let db = Database::in_memory()?;
 db.put(b"temp", b"data")?;
 ```
 
+### Indexing for Fast Lookups (v0.3.0+)
+
+```rust
+use rustlite::{Database, IndexType};
+
+let db = Database::in_memory()?;
+
+// Create indexes
+db.create_index("users_by_email", IndexType::Hash)?;  // O(1) lookups
+db.create_index("users_by_name", IndexType::BTree)?;  // Range queries
+
+// Index your data
+db.put(b"user:1", b"alice@example.com")?;
+db.index_insert("users_by_email", b"alice@example.com", 1)?;
+db.index_insert("users_by_name", b"Alice", 1)?;
+
+// Fast lookups
+let user_ids = db.index_find("users_by_email", b"alice@example.com")?;
+println!("Found user: {}", user_ids[0]); // Output: 1
+```
+
+### Relational Data with Foreign Keys
+
+See [examples/relational_demo.rs](crates/rustlite-api/examples/relational_demo.rs) for a complete example showing:
+- Users and Orders tables
+- Foreign key relationships
+- Primary and secondary indexes
+- Join queries and cascade deletes
+
 ## 📦 Installation
 
 ### From crates.io
@@ -129,21 +159,28 @@ RustLite is built with a modular LSM-tree architecture:
 │                   (rustlite crate)                       │
 ├──────────────────────────────────────────────────────────┤
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐   │
-│  │   Memtable  │  │     WAL     │  │    Snapshot     │   │
-│  │  (BTreeMap) │  │ (Write Log) │  │   (Backups)     │   │
-│  └─────────────┘  └─────────────┘  └─────────────────┘   │
+│  │  Indexing   │  │   Memtable  │  │     WAL         │   │
+│  │  B-Tree +   │  │  (BTreeMap) │  │ (Write Log)     │   │
+│  │  Hash       │  └─────────────┘  └─────────────────┘   │
+│  └─────────────┘                                          │
 │  ┌─────────────────────────────────────────────────────┐ │
-│  │              SSTable Storage                        │ │
-│  │    (Sorted String Tables + Compaction)              │ │
+│  │           SSTable Storage + Compaction              │ │
+│  │        (Sorted String Tables on Disk)               │ │
 │  └─────────────────────────────────────────────────────┘ │
+│  ┌─────────────┐                                          │
+│  │  Snapshot   │  Point-in-time backups                   │
+│  │  Manager    │                                          │
+│  └─────────────┘                                          │
 └──────────────────────────────────────────────────────────┘
 ```
 
+**Key Components:**
+- **Indexing**: B-Tree for range queries, Hash for O(1) lookups
 - **Memtable**: In-memory sorted buffer for fast writes
-- **WAL**: Write-ahead log for crash recovery
+- **WAL**: Write-ahead log for crash recovery and durability
 - **SSTable**: Immutable on-disk sorted files
-- **Compaction**: Background merging to reclaim space
-- **Snapshot**: Point-in-time backups
+- **Compaction**: Background merging to reduce read amplification
+- **Snapshot**: Point-in-time backups for disaster recovery
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for technical details and [docs/README.md](docs/README.md) for the full documentation index.
 
@@ -152,11 +189,11 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for technical details and [docs
 We welcome contributions! Please see our [CONTRIBUTING.md](docs/CONTRIBUTING.md) for guidelines.
 
 Key areas where we need help:
-- Core storage engine implementation
-- Query optimizer
-- Performance benchmarking
+- Query optimizer and query planner
+- Performance benchmarking and optimization
 - Documentation and examples
 - Platform-specific optimizations
+- Advanced indexing (full-text search, spatial indexes)
 
 ## 📋 Requirements
 
@@ -166,11 +203,15 @@ Key areas where we need help:
 ## 🧪 Testing
 
 ```bash
-# Run tests
-cargo test
+# Run all tests (126+ tests)
+cargo test --workspace
 
 # Run with logging
 RUST_LOG=debug cargo test
+
+# Run examples
+cargo run --example persistent_demo
+cargo run --example relational_demo
 
 # Run benchmarks
 cargo bench
@@ -210,9 +251,9 @@ RustLite is inspired by excellent databases like SQLite, LevelDB, and RocksDB.
 
 ## 🗺️ Status
 
-**Current Status**: Early development (v0.1.0)
+**Current Status**: Active development (v0.3.0)
 
-RustLite is in active development and not yet ready for production use. We're working hard to deliver a stable v1.0 release. Star the repo to follow our progress!
+RustLite is in active development with persistent storage, WAL, and indexing capabilities. Not yet production-ready, but suitable for experimentation and development. Star the repo to follow our progress toward v1.0!
 
 ---
 

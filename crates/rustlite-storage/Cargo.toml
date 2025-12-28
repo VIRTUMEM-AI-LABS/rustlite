@@ -13,8 +13,8 @@ keywords = ["database", "lsm-tree", "storage", "internal"]
 categories = ["database"]
 
 [dependencies]
-rustlite-core = { path = "../rustlite-core", version = "0.2.1" }
-rustlite-wal = { path = "../rustlite-wal", version = "0.2.1" }
+rustlite-core = { path = "../rustlite-core", version = "0.3.0" }
+rustlite-wal = { path = "../rustlite-wal", version = "0.3.0" }
 crc32fast.workspace = true
 bincode.workspace = true
 serde.workspace = true

@@ -13,7 +13,7 @@
 //! ```toml
 //! # In your Cargo.toml - use the main crate, not this one:
 //! [dependencies]
-//! rustlite = "0.2"
+//! rustlite = "0.3"
 //! ```
 //!
 //! ---
