@@ -88,7 +88,9 @@ fn test_select_with_where_equals() {
 #[test]
 fn test_select_with_where_greater_than() {
     let db = Database::in_memory().unwrap();
-    let plan = db.prepare("SELECT * FROM products WHERE price > 50").unwrap();
+    let plan = db
+        .prepare("SELECT * FROM products WHERE price > 50")
+        .unwrap();
 
     let mut context = ExecutionContext::new();
     context.data.insert(

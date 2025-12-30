@@ -26,7 +26,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let txn = db.begin()?;
         let alice = txn.get(b"user:alice")?;
-        println!("   ✓ Read back: {:?}", String::from_utf8_lossy(&alice.unwrap()));
+        println!(
+            "   ✓ Read back: {:?}",
+            String::from_utf8_lossy(&alice.unwrap())
+        );
     }
 
     // Demo 2: Rollback
@@ -68,7 +71,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Transaction 1 still sees old value (snapshot isolation)
         let counter_bytes2 = txn1.get(b"counter")?.unwrap();
         let value1_again = String::from_utf8_lossy(&counter_bytes2);
-        println!("   ✓ Transaction 1 still sees: {} (snapshot isolation)", value1_again);
+        println!(
+            "   ✓ Transaction 1 still sees: {} (snapshot isolation)",
+            value1_again
+        );
         assert_eq!(value1, value1_again, "Transaction should see its snapshot");
     }
 
@@ -84,26 +90,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Transfer $200 from Alice to Bob
         let mut txn = db.begin()?;
-        
+
         // Read current balances
-        let alice_balance: i32 = String::from_utf8_lossy(
-            &txn.get(b"account:alice")?.unwrap()
-        ).parse()?;
-        let bob_balance: i32 = String::from_utf8_lossy(
-            &txn.get(b"account:bob")?.unwrap()
-        ).parse()?;
+        let alice_balance: i32 =
+            String::from_utf8_lossy(&txn.get(b"account:alice")?.unwrap()).parse()?;
+        let bob_balance: i32 =
+            String::from_utf8_lossy(&txn.get(b"account:bob")?.unwrap()).parse()?;
 
         // Perform transfer
         let transfer_amount = 200;
         if alice_balance >= transfer_amount {
             let new_alice = alice_balance - transfer_amount;
             let new_bob = bob_balance + transfer_amount;
-            
-            txn.put(b"account:alice".to_vec(), new_alice.to_string().into_bytes())?;
+
+            txn.put(
+                b"account:alice".to_vec(),
+                new_alice.to_string().into_bytes(),
+            )?;
             txn.put(b"account:bob".to_vec(), new_bob.to_string().into_bytes())?;
             txn.commit()?;
-            
-            println!("   ✓ Transfer successful: Alice -${}, Bob +${}", transfer_amount, transfer_amount);
+
+            println!(
+                "   ✓ Transfer successful: Alice -${}, Bob +${}",
+                transfer_amount, transfer_amount
+            );
         } else {
             txn.rollback()?;
             println!("   ✗ Insufficient funds, rolled back");
@@ -115,7 +125,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let bob_bytes = txn.get(b"account:bob")?.unwrap();
         let alice_final = String::from_utf8_lossy(&alice_bytes);
         let bob_final = String::from_utf8_lossy(&bob_bytes);
-        println!("   ✓ Final balances: Alice=${}, Bob=${}", alice_final, bob_final);
+        println!(
+            "   ✓ Final balances: Alice=${}, Bob=${}",
+            alice_final, bob_final
+        );
     }
 
     // Demo 5: Scan with Transactions
@@ -153,7 +166,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Create multiple versions
         for i in 0..5 {
             let mut txn = db.begin()?;
-            txn.put(b"versioned:key".to_vec(), format!("version{}", i).into_bytes())?;
+            txn.put(
+                b"versioned:key".to_vec(),
+                format!("version{}", i).into_bytes(),
+            )?;
             txn.commit()?;
         }
         println!("   ✓ Created 5 versions of a key");

@@ -46,8 +46,10 @@ pub mod transaction;
 pub mod index;
 pub mod query;
 pub mod wal;
+pub mod security;
 
 pub use error::{Error, Result};
+pub use security::ResourceLimits;
 
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};

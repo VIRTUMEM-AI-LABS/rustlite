@@ -292,8 +292,11 @@ fn test_long_running_transaction() {
     // Multiple short transactions commit
     for i in 0..10 {
         let mut txn = manager.begin(IsolationLevel::RepeatableRead).unwrap();
-        txn.put(format!("key{}", i).into_bytes(), format!("value{}", i).into_bytes())
-            .unwrap();
+        txn.put(
+            format!("key{}", i).into_bytes(),
+            format!("value{}", i).into_bytes(),
+        )
+        .unwrap();
         txn.commit().unwrap();
     }
 

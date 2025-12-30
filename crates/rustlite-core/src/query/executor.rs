@@ -328,27 +328,300 @@ impl Executor {
         &mut self,
         left: &PhysicalOperator,
         right: &PhysicalOperator,
-        _join_type: &JoinType,
-        _condition: &Expression,
+        join_type: &JoinType,
+        condition: &Expression,
     ) -> Result<Vec<Row>> {
         let left_rows = self.execute_operator(left)?;
         let right_rows = self.execute_operator(right)?;
 
-        // Simplified join - cartesian product
-        // In a real implementation, this would use the condition to match rows
-        let mut result = Vec::new();
-        for l_row in &left_rows {
-            for r_row in &right_rows {
-                let mut columns = l_row.columns.clone();
-                columns.extend(r_row.columns.clone());
-                let mut values = l_row.values.clone();
-                values.extend(r_row.values.clone());
+        // Choose join algorithm based on dataset size
+        if right_rows.len() < 100 {
+            // Use nested loop join for small datasets
+            self.nested_loop_join(&left_rows, &right_rows, join_type, condition)
+        } else {
+            // Use hash join for larger datasets
+            self.hash_join_impl(&left_rows, &right_rows, join_type, condition)
+        }
+    }
 
-                result.push(Row { columns, values });
+    /// Nested loop join - simple but works for small datasets
+    fn nested_loop_join(
+        &mut self,
+        left_rows: &[Row],
+        right_rows: &[Row],
+        join_type: &JoinType,
+        condition: &Expression,
+    ) -> Result<Vec<Row>> {
+        let mut result = Vec::new();
+
+        match join_type {
+            JoinType::Inner => {
+                for l_row in left_rows {
+                    for r_row in right_rows {
+                        if self.evaluate_join_condition(l_row, r_row, condition) {
+                            result.push(self.merge_rows(l_row, r_row));
+                        }
+                    }
+                }
+            }
+            JoinType::Left => {
+                for l_row in left_rows {
+                    let mut matched = false;
+                    for r_row in right_rows {
+                        if self.evaluate_join_condition(l_row, r_row, condition) {
+                            result.push(self.merge_rows(l_row, r_row));
+                            matched = true;
+                        }
+                    }
+                    if !matched {
+                        // Left row with NULL values for right side
+                        result.push(self.merge_rows_with_null(l_row, right_rows[0].columns.len()));
+                    }
+                }
+            }
+            JoinType::Right => {
+                for r_row in right_rows {
+                    let mut matched = false;
+                    for l_row in left_rows {
+                        if self.evaluate_join_condition(l_row, r_row, condition) {
+                            result.push(self.merge_rows(l_row, r_row));
+                            matched = true;
+                        }
+                    }
+                    if !matched {
+                        // NULL values for left side with right row
+                        result.push(self.merge_null_with_row(left_rows[0].columns.len(), r_row));
+                    }
+                }
+            }
+            JoinType::Full => {
+                let mut left_matched = vec![false; left_rows.len()];
+                let mut right_matched = vec![false; right_rows.len()];
+
+                for (l_idx, l_row) in left_rows.iter().enumerate() {
+                    for (r_idx, r_row) in right_rows.iter().enumerate() {
+                        if self.evaluate_join_condition(l_row, r_row, condition) {
+                            result.push(self.merge_rows(l_row, r_row));
+                            left_matched[l_idx] = true;
+                            right_matched[r_idx] = true;
+                        }
+                    }
+                }
+
+                // Add unmatched left rows
+                for (idx, matched) in left_matched.iter().enumerate() {
+                    if !*matched {
+                        result.push(
+                            self.merge_rows_with_null(&left_rows[idx], right_rows[0].columns.len()),
+                        );
+                    }
+                }
+
+                // Add unmatched right rows
+                for (idx, matched) in right_matched.iter().enumerate() {
+                    if !*matched {
+                        result.push(
+                            self.merge_null_with_row(left_rows[0].columns.len(), &right_rows[idx]),
+                        );
+                    }
+                }
             }
         }
 
         Ok(result)
+    }
+
+    /// Hash join - efficient for larger datasets
+    fn hash_join_impl(
+        &mut self,
+        left_rows: &[Row],
+        right_rows: &[Row],
+        join_type: &JoinType,
+        condition: &Expression,
+    ) -> Result<Vec<Row>> {
+        // Build hash table from right side (build phase)
+        let mut hash_table: HashMap<Vec<u8>, Vec<&Row>> = HashMap::new();
+
+        for r_row in right_rows {
+            let key = self.extract_join_key(r_row, condition, true);
+            hash_table.entry(key).or_insert_with(Vec::new).push(r_row);
+        }
+
+        let mut result = Vec::new();
+
+        match join_type {
+            JoinType::Inner => {
+                for l_row in left_rows {
+                    let key = self.extract_join_key(l_row, condition, false);
+                    if let Some(matching_rows) = hash_table.get(&key) {
+                        for r_row in matching_rows {
+                            if self.evaluate_join_condition(l_row, r_row, condition) {
+                                result.push(self.merge_rows(l_row, r_row));
+                            }
+                        }
+                    }
+                }
+            }
+            JoinType::Left => {
+                for l_row in left_rows {
+                    let key = self.extract_join_key(l_row, condition, false);
+                    if let Some(matching_rows) = hash_table.get(&key) {
+                        let mut matched = false;
+                        for r_row in matching_rows {
+                            if self.evaluate_join_condition(l_row, r_row, condition) {
+                                result.push(self.merge_rows(l_row, r_row));
+                                matched = true;
+                            }
+                        }
+                        if !matched {
+                            result.push(
+                                self.merge_rows_with_null(l_row, right_rows[0].columns.len()),
+                            );
+                        }
+                    } else {
+                        result.push(self.merge_rows_with_null(l_row, right_rows[0].columns.len()));
+                    }
+                }
+            }
+            JoinType::Right | JoinType::Full => {
+                // For RIGHT and FULL, fall back to nested loop
+                // (hash join is less efficient for these join types)
+                return self.nested_loop_join(left_rows, right_rows, join_type, condition);
+            }
+        }
+
+        Ok(result)
+    }
+
+    /// Extract join key from row for hashing
+    fn extract_join_key(&self, row: &Row, condition: &Expression, is_right: bool) -> Vec<u8> {
+        // Simple key extraction - would be more sophisticated in production
+        match condition {
+            Expression::BinaryOp { left, right, .. } => {
+                if let (Expression::Column(left_col), Expression::Column(right_col)) =
+                    (left.as_ref(), right.as_ref())
+                {
+                    let col_name = if is_right { right_col } else { left_col };
+
+                    // Strip table prefix if present (e.g., "users.id" -> "id")
+                    let column_name = if let Some(dot_pos) = col_name.rfind('.') {
+                        &col_name[dot_pos + 1..]
+                    } else {
+                        col_name
+                    };
+
+                    if let Some(idx) = row.columns.iter().position(|c| c.name == column_name) {
+                        return row.values[idx].to_bytes();
+                    }
+                }
+            }
+            _ => {}
+        }
+        vec![]
+    }
+
+    /// Evaluate join condition for two rows
+    fn evaluate_join_condition(&self, left: &Row, right: &Row, condition: &Expression) -> bool {
+        match condition {
+            Expression::BinaryOp {
+                left: l_expr,
+                op,
+                right: r_expr,
+            } => {
+                let left_val = self.evaluate_expression_for_row(l_expr, left, right, true);
+                let right_val = self.evaluate_expression_for_row(r_expr, left, right, false);
+
+                if let (Some(lv), Some(rv)) = (left_val, right_val) {
+                    return lv.compare(&rv, op);
+                }
+                false
+            }
+            Expression::LogicalOp {
+                left: l_expr,
+                op,
+                right: r_expr,
+            } => {
+                let left_result = self.evaluate_join_condition(left, right, l_expr);
+                let right_result = self.evaluate_join_condition(left, right, r_expr);
+
+                match op {
+                    LogicalOperator::And => left_result && right_result,
+                    LogicalOperator::Or => left_result || right_result,
+                }
+            }
+            _ => true, // Default to true for unsupported conditions
+        }
+    }
+
+    /// Evaluate expression in the context of two joined rows
+    fn evaluate_expression_for_row(
+        &self,
+        expr: &Expression,
+        left_row: &Row,
+        right_row: &Row,
+        is_left: bool,
+    ) -> Option<Value> {
+        match expr {
+            Expression::Column(name) => {
+                // Strip table prefix if present (e.g., "users.id" -> "id")
+                let column_name = if let Some(dot_pos) = name.rfind('.') {
+                    &name[dot_pos + 1..]
+                } else {
+                    name
+                };
+
+                // Try to find column in appropriate row
+                let row = if is_left { left_row } else { right_row };
+                row.columns
+                    .iter()
+                    .position(|c| c.name == column_name)
+                    .map(|idx| row.values[idx].clone())
+            }
+            Expression::Literal(lit) => Some(self.literal_to_value(lit)),
+            _ => None,
+        }
+    }
+
+    /// Merge two rows into one
+    fn merge_rows(&self, left: &Row, right: &Row) -> Row {
+        let mut columns = left.columns.clone();
+        columns.extend(right.columns.clone());
+        let mut values = left.values.clone();
+        values.extend(right.values.clone());
+        Row { columns, values }
+    }
+
+    /// Merge left row with NULL values for right side
+    fn merge_rows_with_null(&self, left: &Row, right_col_count: usize) -> Row {
+        let mut columns = left.columns.clone();
+        let mut values = left.values.clone();
+        for _ in 0..right_col_count {
+            values.push(Value::Null);
+        }
+        Row { columns, values }
+    }
+
+    /// Merge NULL values for left side with right row
+    fn merge_null_with_row(&self, left_col_count: usize, right: &Row) -> Row {
+        let mut columns = Vec::new();
+        let mut values = Vec::new();
+        for _ in 0..left_col_count {
+            values.push(Value::Null);
+        }
+        columns.extend(right.columns.clone());
+        values.extend(right.values.clone());
+        Row { columns, values }
+    }
+
+    /// Convert literal to value
+    fn literal_to_value(&self, lit: &Literal) -> Value {
+        match lit {
+            Literal::Integer(i) => Value::Integer(*i),
+            Literal::Float(f) => Value::Float(*f),
+            Literal::String(s) => Value::String(s.clone()),
+            Literal::Boolean(b) => Value::Boolean(*b),
+            Literal::Null => Value::Null,
+        }
     }
 
     fn execute_aggregate(

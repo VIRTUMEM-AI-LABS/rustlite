@@ -16,19 +16,25 @@ categories = ["database", "embedded", "data-structures"]
 # Files to include in the published crate
 include = [
     "../../README.md",
-    "../../CHANGELOG.md",
-    "../../CONTRIBUTING.md",
     "../../LICENSE",
-    "../../assets/*",
-    "src/**",
+    "../../assets/logo-icon.svg",
+    "../../assets/logo-wordmark.svg",
+    "src/**/*",
+    "examples/**/*",
+    "tests/**/*",
     "Cargo.toml",
 ]
 
 [dependencies]
-rustlite-core = { path = "../rustlite-core", version = "0.5.0" }
-rustlite-wal = { path = "../rustlite-wal", version = "0.5.0" }
-rustlite-storage = { path = "../rustlite-storage", version = "0.5.0" }
-rustlite-snapshot = { path = "../rustlite-snapshot", version = "0.5.0" }
+rustlite-core = { path = "../rustlite-core", version = "0.6.0" }
+rustlite-wal = { path = "../rustlite-wal", version = "0.6.0" }
+rustlite-storage = { path = "../rustlite-storage", version = "0.6.0" }
+rustlite-snapshot = { path = "../rustlite-snapshot", version = "0.6.0" }
+
+# Logging (v1.0+)
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tracing-appender.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true

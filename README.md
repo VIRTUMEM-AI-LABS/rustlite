@@ -1,16 +1,18 @@
 # RustLite
 
-
-<p align="right">
-    <img src="assets/logo-wordmark.svg" alt="RustLite logo" width="100" />
+<p align="center">
+    <img src="https://raw.githubusercontent.com/VIRTUMEM-AI-LABS/rustlite/main/assets/logo-wordmark.svg" alt="RustLite Logo" width="300" />
 </p>
+
+<p align="center">
 
 [![Crates.io](https://img.shields.io/crates/v/rustlite.svg)](https://crates.io/crates/rustlite)
 [![Documentation](https://docs.rs/rustlite/badge.svg)](https://docs.rs/rustlite)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 [![Build Status](https://github.com/VIRTUMEM-AI-LABS/rustlite/workflows/CI/badge.svg)](https://github.com/VIRTUMEM-AI-LABS/rustlite/actions)
-
 [![Changelog](https://img.shields.io/badge/Changelog-docs/CHANGELOG.md-blue.svg)](docs/CHANGELOG.md)
+
+</p>
 
 **RustLite** is a lightweight, high-performance embedded database written entirely in Rust. Designed for applications that need a fast, reliable, and embeddable storage solution with ACID guarantees.
 
@@ -48,7 +50,7 @@ RustLite excels in scenarios where you need fast, transactional key-value storag
 
 ## ✨ Features
 
-### Current (v0.5.0)
+### Current (v0.6.0-dev)
 - ✅ **Persistent storage** with LSM-tree architecture
 - ✅ **Write-Ahead Logging (WAL)** for crash recovery
 - ✅ **SSTable compaction** for optimized disk usage
@@ -57,6 +59,9 @@ RustLite excels in scenarios where you need fast, transactional key-value storag
 - ✅ **Hash indexing** for O(1) exact-match lookups
 - ✅ **SQL-like query engine** with SELECT, WHERE, LIMIT support
 - ✅ **Full MVCC transactions** with snapshot isolation
+- ✅ **JOIN operations** (INNER, LEFT, RIGHT, FULL OUTER)
+- ✅ **Hash join** and **nested loop join** algorithms
+- ✅ **Production logging** with structured tracing
 - ✅ Thread-safe concurrent access
 - ✅ Simple, ergonomic API
 
@@ -247,6 +252,30 @@ RustLite is built with a modular LSM-tree architecture:
 - **Snapshot**: Point-in-time backups for disaster recovery
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for technical details and [docs/README.md](docs/README.md) for the full documentation index.
+
+## 📝 Production Logging (v0.6+)
+
+RustLite includes production-grade structured logging:
+
+```rust
+use rustlite::logging::LogConfig;
+use rustlite::Database;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Initialize logging (info level to file with daily rotation)
+    let _guard = LogConfig::info()
+        .with_file("./logs/rustlite.log")
+        .init();
+    
+    let db = Database::open("./data")?;
+    // All operations are now logged with structured context
+    db.put(b"key", b"value")?;  // Logs: "Writing key-value pair" with sizes
+    
+    Ok(())
+}
+```
+
+See [docs/LOGGING.md](docs/LOGGING.md) for comprehensive logging guide.
 
 ## 🤝 Contributing
 

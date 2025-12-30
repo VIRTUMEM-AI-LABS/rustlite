@@ -5,6 +5,7 @@ use rustlite_core::{Error, Result};
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
+use tracing::{debug, info, instrument};
 
 pub struct WalWriter {
     file: BufWriter<File>,
@@ -17,7 +18,10 @@ pub struct WalWriter {
 }
 
 impl WalWriter {
+    #[instrument(skip(wal_dir), fields(wal_dir = ?wal_dir, max_segment_size = max_segment_size))]
     pub fn new(wal_dir: &PathBuf, max_segment_size: u64, sync_mode: SyncMode) -> Result<Self> {
+        info!("Creating WAL writer");
+
         // Create WAL directory if it doesn't exist
         std::fs::create_dir_all(wal_dir)
             .map_err(|e| Error::Storage(format!("Failed to create WAL directory: {}", e)))?;
@@ -75,7 +79,10 @@ impl WalWriter {
         Ok(max_seq)
     }
 
+    #[instrument(skip(self, record), fields(record_type = ?record))]
     pub fn append(&mut self, record: WalRecord) -> Result<u64> {
+        debug!(sequence = self.sequence, "Appending WAL record");
+
         // Encode the record
         let encoded = record.encode()?;
         let record_size = encoded.len() as u64;

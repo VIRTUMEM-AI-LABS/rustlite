@@ -22,8 +22,12 @@ use std::fs::{self, File};
 use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
-/// Magic number for SSTable files
-const SSTABLE_MAGIC: u64 = 0x53_53_54_42_4C_49_54; // "SSTBLIT" in hex-ish
+/// Magic number for SSTable files ("SSTBLIT" in ASCII-ish)
+const SSTABLE_MAGIC: u64 = 0x53_53_54_42_4C_49_54;
+
+/// SSTable format version (v1.0.0+)
+/// Increment this when making incompatible format changes
+const SSTABLE_FORMAT_VERSION: u16 = 1;
 
 /// Default block size (4KB)
 const DEFAULT_BLOCK_SIZE: usize = 4096;
@@ -82,6 +86,8 @@ pub struct IndexEntry {
 /// SSTable footer containing metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SSTableFooter {
+    /// Format version (v1.0.0+)
+    pub format_version: u16,
     /// Offset of the index block
     pub index_offset: u64,
     /// Size of the index block
@@ -248,6 +254,7 @@ impl SSTableWriter {
         let max_key = self.max_key.clone().unwrap_or_default();
 
         let footer_data = SSTableFooter {
+            format_version: SSTABLE_FORMAT_VERSION,
             index_offset,
             index_size,
             entry_count: self.entry_count,
@@ -352,6 +359,14 @@ impl SSTableReader {
         // Validate magic number
         if footer.magic != SSTABLE_MAGIC {
             return Err(Error::Corruption("Invalid SSTable magic number".into()));
+        }
+
+        // Validate format version (v1.0.0+)
+        if footer.format_version != SSTABLE_FORMAT_VERSION {
+            return Err(Error::Corruption(format!(
+                "Unsupported SSTable format version: {} (expected {})",
+                footer.format_version, SSTABLE_FORMAT_VERSION
+            )));
         }
 
         // Read index

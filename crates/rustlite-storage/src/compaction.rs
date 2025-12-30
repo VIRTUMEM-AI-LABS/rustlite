@@ -11,6 +11,7 @@ use std::collections::BinaryHeap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering as AtomicOrdering};
 use std::sync::Arc;
+use tracing::{info, instrument, warn};
 
 /// Compaction configuration
 #[derive(Debug, Clone)]
@@ -174,11 +175,17 @@ impl CompactionWorker {
     }
 
     /// Compact level 0 to level 1
+    #[instrument(skip(self, manifest))]
     pub fn compact_level0(&mut self, manifest: &mut Manifest) -> Result<()> {
         let level0_sstables = manifest.sstables_at_level(0);
         if level0_sstables.is_empty() {
             return Ok(());
         }
+
+        info!(
+            level0_count = level0_sstables.len(),
+            "Starting level 0 compaction"
+        );
 
         // Collect all level 0 SSTable paths
         let input_paths: Vec<PathBuf> = level0_sstables

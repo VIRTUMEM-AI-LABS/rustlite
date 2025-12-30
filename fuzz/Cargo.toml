@@ -1,0 +1,65 @@
+[package]
+name = "rustlite-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1.3", features = ["derive"] }
+tempfile = "3.0"
+
+[dependencies.rustlite]
+path = "../crates/rustlite-api"
+
+[dependencies.rustlite-core]
+path = "../crates/rustlite-core"
+
+[dependencies.rustlite-wal]
+path = "../crates/rustlite-wal"
+
+[dependencies.rustlite-storage]
+path = "../crates/rustlite-storage"
+
+# Fuzz target: SQL Query Parser
+[[bin]]
+name = "fuzz_query_parser"
+path = "fuzz_targets/fuzz_query_parser.rs"
+test = false
+doc = false
+bench = false
+
+# Fuzz target: WAL Record Parser
+[[bin]]
+name = "fuzz_wal_record"
+path = "fuzz_targets/fuzz_wal_record.rs"
+test = false
+doc = false
+bench = false
+
+# Fuzz target: SSTable Reader
+[[bin]]
+name = "fuzz_sstable_reader"
+path = "fuzz_targets/fuzz_sstable_reader.rs"
+test = false
+doc = false
+bench = false
+
+# Fuzz target: Database Operations
+[[bin]]
+name = "fuzz_database_ops"
+path = "fuzz_targets/fuzz_database_ops.rs"
+test = false
+doc = false
+bench = false
+
+# Fuzz target: Key-Value Pairs
+[[bin]]
+name = "fuzz_key_value"
+path = "fuzz_targets/fuzz_key_value.rs"
+test = false
+doc = false
+bench = false

@@ -74,13 +74,18 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 
+use tracing::{debug, info, instrument, warn};
+
+pub mod logging;
+mod security;
+
 // Re-export core types
 pub use rustlite_core::index::{BTreeIndex, HashIndex, Index, IndexInfo, IndexManager, IndexType};
 pub use rustlite_core::{Error, Result};
 
 // Transaction support (v0.5.0+)
 pub use rustlite_core::transaction::{
-    IsolationLevel, MVCCStorage, Transaction, TransactionId, TransactionManager, Timestamp,
+    IsolationLevel, MVCCStorage, Timestamp, Transaction, TransactionId, TransactionManager,
     VersionChain, VersionedValue,
 };
 
@@ -172,10 +177,13 @@ impl Database {
     /// # Ok::<(), rustlite::Error>(())
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let path_ref = path.as_ref();
+        info!(path = ?path_ref, "Opening RustLite database");
+
         let engine = StorageEngine::open(path)?;
         let mvcc_storage = Arc::new(MVCCStorage::new());
         let tx_manager = TransactionManager::new(mvcc_storage);
-        
+
         Ok(Database {
             inner: Arc::new(DatabaseInner {
                 storage: StorageBackend::Persistent(engine),
@@ -195,7 +203,7 @@ impl Database {
         let engine = StorageEngine::open_with_config(path, config)?;
         let mvcc_storage = Arc::new(MVCCStorage::new());
         let tx_manager = TransactionManager::new(mvcc_storage);
-        
+
         Ok(Database {
             inner: Arc::new(DatabaseInner {
                 storage: StorageBackend::Persistent(engine),
@@ -221,9 +229,11 @@ impl Database {
     /// # Ok::<(), rustlite::Error>(())
     /// ```
     pub fn in_memory() -> Result<Self> {
+        info!("Creating in-memory RustLite database");
+
         let mvcc_storage = Arc::new(MVCCStorage::new());
         let tx_manager = TransactionManager::new(mvcc_storage);
-        
+
         Ok(Database {
             inner: Arc::new(DatabaseInner {
                 storage: StorageBackend::Memory(RwLock::new(HashMap::new())),
@@ -263,7 +273,14 @@ impl Database {
     /// db.put(b"name", b"Bob")?; // Updates the value
     /// # Ok::<(), rustlite::Error>(())
     /// ```
+    #[instrument(skip(self, key, value), fields(key_len = key.len(), value_len = value.len()))]
     pub fn put(&self, key: &[u8], value: &[u8]) -> Result<()> {
+        // Security: Validate inputs
+        security::validate_key(key)?;
+        security::validate_value(value)?;
+
+        debug!("Writing key-value pair");
+
         match &self.inner.storage {
             StorageBackend::Memory(store) => {
                 let mut store = store.write().map_err(|_| Error::LockPoisoned)?;
@@ -296,7 +313,13 @@ impl Database {
     /// }
     /// # Ok::<(), rustlite::Error>(())
     /// ```
+    #[instrument(skip(self, key), fields(key_len = key.len()))]
     pub fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
+        // Security: Validate inputs
+        security::validate_key(key)?;
+
+        debug!("Reading key");
+
         match &self.inner.storage {
             StorageBackend::Memory(store) => {
                 let store = store.read().map_err(|_| Error::LockPoisoned)?;
@@ -325,7 +348,13 @@ impl Database {
     /// assert_eq!(db.get(b"temp")?, None);
     /// # Ok::<(), rustlite::Error>(())
     /// ```
+    #[instrument(skip(self, key), fields(key_len = key.len()))]
     pub fn delete(&self, key: &[u8]) -> Result<bool> {
+        // Security: Validate inputs
+        security::validate_key(key)?;
+
+        debug!("Deleting key");
+
         match &self.inner.storage {
             StorageBackend::Memory(store) => {
                 let mut store = store.write().map_err(|_| Error::LockPoisoned)?;
@@ -390,7 +419,13 @@ impl Database {
     /// db.create_index("sessions", IndexType::Hash)?;
     /// # Ok::<(), rustlite::Error>(())
     /// ```
+    #[instrument(skip(self), fields(name = %name, index_type = ?index_type))]
     pub fn create_index(&self, name: &str, index_type: IndexType) -> Result<()> {
+        // Security: Validate index name
+        security::validate_index_name(name)?;
+
+        info!("Creating index");
+
         let mut indexes = self
             .inner
             .indexes
@@ -561,7 +596,13 @@ impl Database {
     /// assert_eq!(results.len(), 1);
     /// # Ok::<(), rustlite::Error>(())
     /// ```
+    #[instrument(skip(self, sql, context), fields(sql_len = sql.len()))]
     pub fn query(&self, sql: &str, context: ExecutionContext) -> Result<Vec<Row>> {
+        // Security: Validate query length
+        security::validate_query(sql)?;
+
+        debug!(sql = %sql, "Executing query");
+
         // Parse the SQL
         let mut parser =
             Parser::new(sql).map_err(|e| Error::InvalidInput(format!("Parse error: {}", e)))?;
@@ -638,7 +679,9 @@ impl Database {
     /// txn.commit()?;
     /// # Ok::<(), rustlite::Error>(())
     /// ```
+    #[instrument(skip(self), fields(isolation = ?isolation))]
     pub fn begin_transaction(&self, isolation: IsolationLevel) -> Result<Transaction> {
+        info!("Beginning transaction");
         if let Some(ref manager) = self.inner.transaction_manager {
             manager.begin(isolation)
         } else {
@@ -1079,7 +1122,8 @@ mod tests {
         txn.commit().unwrap();
 
         // Manually update index (in real use, this would be automated)
-        db.index_insert("user_idx", b"alice@example.com", 1).unwrap();
+        db.index_insert("user_idx", b"alice@example.com", 1)
+            .unwrap();
 
         // Transaction 2: Query via index
         let txn2 = db.begin().unwrap();
@@ -1159,8 +1203,7 @@ mod tests {
 
         // Use transaction to populate data
         let mut txn = db.begin().unwrap();
-        txn.put(b"user:1:name".to_vec(), b"Alice".to_vec())
-            .unwrap();
+        txn.put(b"user:1:name".to_vec(), b"Alice".to_vec()).unwrap();
         txn.put(b"user:1:age".to_vec(), b"30".to_vec()).unwrap();
         txn.put(b"user:2:name".to_vec(), b"Bob".to_vec()).unwrap();
         txn.put(b"user:2:age".to_vec(), b"25".to_vec()).unwrap();
@@ -1218,7 +1261,7 @@ mod tests {
                 db.get(b"direct_key").unwrap(),
                 Some(b"direct_value".to_vec())
             );
-            
+
             // Note: MVCC transactions are in-memory only in current implementation
             // This test verifies the database persistence, not transaction persistence
         }
@@ -1278,9 +1321,7 @@ mod tests {
         setup.commit().unwrap();
 
         // Use serializable isolation
-        let txn = db
-            .begin_transaction(IsolationLevel::Serializable)
-            .unwrap();
+        let txn = db.begin_transaction(IsolationLevel::Serializable).unwrap();
         assert_eq!(txn.isolation_level(), IsolationLevel::Serializable);
 
         let value = txn.get(b"counter").unwrap();
@@ -1295,14 +1336,10 @@ mod tests {
         let _txn1 = db
             .begin_transaction(IsolationLevel::ReadUncommitted)
             .unwrap();
-        let _txn2 = db
-            .begin_transaction(IsolationLevel::ReadCommitted)
-            .unwrap();
+        let _txn2 = db.begin_transaction(IsolationLevel::ReadCommitted).unwrap();
         let _txn3 = db
             .begin_transaction(IsolationLevel::RepeatableRead)
             .unwrap();
-        let _txn4 = db
-            .begin_transaction(IsolationLevel::Serializable)
-            .unwrap();
+        let _txn4 = db.begin_transaction(IsolationLevel::Serializable).unwrap();
     }
 }

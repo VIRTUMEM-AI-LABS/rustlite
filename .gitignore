@@ -57,7 +57,17 @@ marketing/
 # Temporary files
 tmp/
 
-# Documentation
-docs/
 
-
+docs/API_STABILITY.md
+docs/BRANDING.md
+docs/CODE_OF_CONDUCT.md
+docs/GOVERNANCE.md
+docs/ROADMAP.md
+docs/logging_implementation_summary.md
+docs/security_hardening_summary.md
+docs/v0.2_persistence_plan.md
+docs/wal_implementation_plan.md
+docs/wal_status_hands_on.md
+docs/workspace_migration_summary.md
+docs/workspace_structure.md
+docs/guides/join_operations.md
