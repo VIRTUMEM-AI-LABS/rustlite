@@ -27,6 +27,8 @@ impl Parser {
         let select = self.parse_select()?;
         let from = self.parse_from()?;
         let where_clause = self.parse_where()?;
+        let group_by = self.parse_group_by()?;
+        let having = self.parse_having()?;
         let order_by = self.parse_order_by()?;
         let limit = self.parse_limit()?;
 
@@ -36,6 +38,8 @@ impl Parser {
             select,
             from,
             where_clause,
+            group_by,
+            having,
             order_by,
             limit,
         })
@@ -216,6 +220,56 @@ impl Parser {
         let condition = self.parse_expression()?;
 
         Ok(Some(WhereClause { condition }))
+    }
+
+    fn parse_group_by(&mut self) -> Result<Option<GroupByClause>, ParseError> {
+        if self.current_token() != &Token::Group {
+            return Ok(None);
+        }
+
+        self.advance();
+        self.expect_token(Token::By)?;
+
+        let mut columns = Vec::new();
+
+        loop {
+            if let Token::Identifier(name) = self.current_token().clone() {
+                self.advance();
+                columns.push(name);
+
+                if self.current_token() == &Token::Comma {
+                    self.advance();
+                    continue;
+                } else {
+                    break;
+                }
+            } else {
+                return Err(ParseError::UnexpectedToken {
+                    expected: "column name".to_string(),
+                    found: self.current_token().clone(),
+                });
+            }
+        }
+
+        if columns.is_empty() {
+            return Err(ParseError::UnexpectedToken {
+                expected: "at least one column for GROUP BY".to_string(),
+                found: self.current_token().clone(),
+            });
+        }
+
+        Ok(Some(GroupByClause { columns }))
+    }
+
+    fn parse_having(&mut self) -> Result<Option<HavingClause>, ParseError> {
+        if self.current_token() != &Token::Having {
+            return Ok(None);
+        }
+
+        self.advance();
+        let condition = self.parse_expression()?;
+
+        Ok(Some(HavingClause { condition }))
     }
 
     fn parse_expression(&mut self) -> Result<Expression, ParseError> {

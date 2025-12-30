@@ -141,6 +141,7 @@ pub fn validate_index_name(name: &str) -> Result<()> {
 /// # Errors
 ///
 /// Returns Error::InvalidInput if validation fails
+#[allow(dead_code)]
 #[inline]
 pub fn validate_path(path: &str) -> Result<()> {
     const MAX_PATH_LENGTH: usize = 4096;

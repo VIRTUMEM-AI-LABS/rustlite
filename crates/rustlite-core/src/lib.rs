@@ -20,6 +20,7 @@
 #![warn(clippy::all)]
 
 pub mod error;
+/// File format versioning for SSTable, WAL, and Manifest
 pub mod format_version;
 pub mod index;
 /// SQL-like query engine (v0.4+)

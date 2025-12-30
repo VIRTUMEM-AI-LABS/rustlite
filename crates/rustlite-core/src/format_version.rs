@@ -2,7 +2,6 @@
 ///
 /// This module defines version constants for all file formats to ensure
 /// forward/backward compatibility and safe upgrades.
-
 /// SSTable format version
 pub const SSTABLE_FORMAT_VERSION: u16 = 1;
 

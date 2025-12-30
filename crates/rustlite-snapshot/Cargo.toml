@@ -13,8 +13,8 @@ keywords = ["database", "backup", "snapshot", "internal"]
 categories = ["database"]
 
 [dependencies]
-rustlite-core = { path = "../rustlite-core", version = "0.6.0" }
-rustlite-storage = { path = "../rustlite-storage", version = "0.6.0" }
+rustlite-core = { path = "../rustlite-core", version = "0.7.0" }
+rustlite-storage = { path = "../rustlite-storage", version = "0.7.0" }
 serde.workspace = true
 bincode.workspace = true
 crc32fast.workspace = true

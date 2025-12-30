@@ -6,6 +6,44 @@ use super::planner::{PhysicalOperator, PhysicalPlan};
 use crate::error::Result;
 use std::collections::HashMap;
 use std::fmt;
+use std::hash::{Hash, Hasher};
+
+/// Hashable wrapper for group key values
+#[derive(Debug, Clone, Eq)]
+struct GroupKey(Vec<GroupValue>);
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+enum GroupValue {
+    Integer(i64),
+    Float(i64), // Store float as bits for hashing
+    String(String),
+    Boolean(bool),
+    Null,
+}
+
+impl From<&Value> for GroupValue {
+    fn from(value: &Value) -> Self {
+        match value {
+            Value::Integer(i) => GroupValue::Integer(*i),
+            Value::Float(f) => GroupValue::Float(f.to_bits() as i64),
+            Value::String(s) => GroupValue::String(s.clone()),
+            Value::Boolean(b) => GroupValue::Boolean(*b),
+            Value::Null => GroupValue::Null,
+        }
+    }
+}
+
+impl PartialEq for GroupKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl Hash for GroupKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
+}
 
 /// Query result row
 #[derive(Debug, Clone, PartialEq)]
@@ -151,6 +189,12 @@ impl Executor {
                 join_type,
                 condition,
             } => self.execute_hash_join(left, right, join_type, condition),
+            PhysicalOperator::GroupBy {
+                input,
+                group_columns,
+                aggregates,
+                having,
+            } => self.execute_group_by(input, group_columns, aggregates, having.as_ref()),
             PhysicalOperator::Aggregate { input, aggregates } => {
                 self.execute_aggregate(input, aggregates)
             }
@@ -444,7 +488,7 @@ impl Executor {
 
         for r_row in right_rows {
             let key = self.extract_join_key(r_row, condition, true);
-            hash_table.entry(key).or_insert_with(Vec::new).push(r_row);
+            hash_table.entry(key).or_default().push(r_row);
         }
 
         let mut result = Vec::new();
@@ -496,26 +540,23 @@ impl Executor {
     /// Extract join key from row for hashing
     fn extract_join_key(&self, row: &Row, condition: &Expression, is_right: bool) -> Vec<u8> {
         // Simple key extraction - would be more sophisticated in production
-        match condition {
-            Expression::BinaryOp { left, right, .. } => {
-                if let (Expression::Column(left_col), Expression::Column(right_col)) =
-                    (left.as_ref(), right.as_ref())
-                {
-                    let col_name = if is_right { right_col } else { left_col };
+        if let Expression::BinaryOp { left, right, .. } = condition {
+            if let (Expression::Column(left_col), Expression::Column(right_col)) =
+                (left.as_ref(), right.as_ref())
+            {
+                let col_name = if is_right { right_col } else { left_col };
 
-                    // Strip table prefix if present (e.g., "users.id" -> "id")
-                    let column_name = if let Some(dot_pos) = col_name.rfind('.') {
-                        &col_name[dot_pos + 1..]
-                    } else {
-                        col_name
-                    };
+                // Strip table prefix if present (e.g., "users.id" -> "id")
+                let column_name = if let Some(dot_pos) = col_name.rfind('.') {
+                    &col_name[dot_pos + 1..]
+                } else {
+                    col_name
+                };
 
-                    if let Some(idx) = row.columns.iter().position(|c| c.name == column_name) {
-                        return row.values[idx].to_bytes();
-                    }
+                if let Some(idx) = row.columns.iter().position(|c| c.name == column_name) {
+                    return row.values[idx].to_bytes();
                 }
             }
-            _ => {}
         }
         vec![]
     }
@@ -593,7 +634,7 @@ impl Executor {
 
     /// Merge left row with NULL values for right side
     fn merge_rows_with_null(&self, left: &Row, right_col_count: usize) -> Row {
-        let mut columns = left.columns.clone();
+        let columns = left.columns.clone();
         let mut values = left.values.clone();
         for _ in 0..right_col_count {
             values.push(Value::Null);
@@ -624,6 +665,263 @@ impl Executor {
         }
     }
 
+    fn execute_group_by(
+        &mut self,
+        input: &PhysicalOperator,
+        group_columns: &[String],
+        aggregates: &[SelectColumn],
+        having: Option<&Expression>,
+    ) -> Result<Vec<Row>> {
+        let rows = self.execute_operator(input)?;
+
+        if rows.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Group rows by the specified columns
+        let mut groups: HashMap<GroupKey, Vec<Row>> = HashMap::new();
+
+        for row in rows {
+            // Extract group key values
+            let mut key_values = Vec::new();
+            for group_col in group_columns {
+                if let Some(col_idx) = row.columns.iter().position(|c| &c.name == group_col) {
+                    key_values.push(GroupValue::from(&row.values[col_idx]));
+                } else {
+                    key_values.push(GroupValue::Null);
+                }
+            }
+
+            let group_key = GroupKey(key_values);
+            groups.entry(group_key).or_default().push(row);
+        }
+
+        // Apply aggregates for each group
+        let mut result_rows = Vec::new();
+
+        for (group_key, group_rows) in groups {
+            let mut result_columns = Vec::new();
+            let mut result_values = Vec::new();
+
+            // Add group columns
+            for (i, col_name) in group_columns.iter().enumerate() {
+                result_columns.push(Column {
+                    name: col_name.clone(),
+                    alias: None,
+                });
+                // Convert GroupValue back to Value
+                let value = match &group_key.0[i] {
+                    GroupValue::Integer(i) => Value::Integer(*i),
+                    GroupValue::Float(bits) => Value::Float(f64::from_bits(*bits as u64)),
+                    GroupValue::String(s) => Value::String(s.clone()),
+                    GroupValue::Boolean(b) => Value::Boolean(*b),
+                    GroupValue::Null => Value::Null,
+                };
+                result_values.push(value);
+            }
+
+            // Add aggregate columns
+            for agg in aggregates {
+                if let SelectColumn::Aggregate {
+                    function,
+                    column,
+                    alias,
+                } = agg
+                {
+                    let col_name = match column.as_ref() {
+                        SelectColumn::Wildcard => "*",
+                        SelectColumn::Column { name, .. } => name.as_str(),
+                        _ => continue,
+                    };
+
+                    let value = self.compute_aggregate(function, col_name, &group_rows)?;
+
+                    let display_name = alias
+                        .as_ref()
+                        .cloned()
+                        .unwrap_or_else(|| format!("{}({})", function, col_name));
+
+                    result_columns.push(Column {
+                        name: display_name.clone(),
+                        alias: alias.clone(),
+                    });
+                    result_values.push(value);
+                } else if let SelectColumn::Column { name, alias: _ } = agg {
+                    // Non-aggregate column (must be in GROUP BY)
+                    if !group_columns.contains(name) {
+                        // This would be a SQL error - column must be in GROUP BY or be aggregated
+                        continue;
+                    }
+                }
+            }
+
+            let row = Row {
+                columns: result_columns,
+                values: result_values,
+            };
+
+            // Apply HAVING clause if present
+            if let Some(having_condition) = having {
+                if self.evaluate_condition(&row, having_condition) {
+                    result_rows.push(row);
+                }
+            } else {
+                result_rows.push(row);
+            }
+        }
+
+        Ok(result_rows)
+    }
+
+    fn compute_aggregate(
+        &self,
+        function: &AggregateFunction,
+        col_name: &str,
+        rows: &[Row],
+    ) -> Result<Value> {
+        if rows.is_empty() {
+            return Ok(Value::Null);
+        }
+
+        match function {
+            AggregateFunction::Count => {
+                if col_name == "*" {
+                    // COUNT(*): Count all rows
+                    Ok(Value::Integer(rows.len() as i64))
+                } else {
+                    // COUNT(column): Count non-null values
+                    let col_idx = rows
+                        .iter()
+                        .find_map(|r| r.columns.iter().position(|c| c.name == col_name));
+
+                    if let Some(idx) = col_idx {
+                        let count = rows
+                            .iter()
+                            .filter(|r| {
+                                idx < r.values.len() && !matches!(r.values[idx], Value::Null)
+                            })
+                            .count();
+                        Ok(Value::Integer(count as i64))
+                    } else {
+                        Ok(Value::Integer(0))
+                    }
+                }
+            }
+            AggregateFunction::Sum => {
+                // Find column index - check all rows if first doesn't have it
+                let col_idx = rows
+                    .iter()
+                    .find_map(|r| r.columns.iter().position(|c| c.name == col_name));
+
+                if let Some(idx) = col_idx {
+                    let sum: i64 = rows
+                        .iter()
+                        .filter_map(|r| {
+                            if idx < r.values.len() {
+                                match &r.values[idx] {
+                                    Value::Integer(i) => Some(i),
+                                    _ => None,
+                                }
+                            } else {
+                                None
+                            }
+                        })
+                        .sum();
+                    Ok(Value::Integer(sum))
+                } else {
+                    Ok(Value::Null)
+                }
+            }
+            AggregateFunction::Avg => {
+                let col_idx = rows
+                    .iter()
+                    .find_map(|r| r.columns.iter().position(|c| c.name == col_name));
+
+                if let Some(idx) = col_idx {
+                    let values: Vec<i64> = rows
+                        .iter()
+                        .filter_map(|r| {
+                            if idx < r.values.len() {
+                                match &r.values[idx] {
+                                    Value::Integer(i) => Some(*i),
+                                    _ => None,
+                                }
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                    if !values.is_empty() {
+                        let sum: i64 = values.iter().sum();
+                        Ok(Value::Float(sum as f64 / values.len() as f64))
+                    } else {
+                        Ok(Value::Null)
+                    }
+                } else {
+                    Ok(Value::Null)
+                }
+            }
+            AggregateFunction::Min => {
+                let col_idx = rows
+                    .iter()
+                    .find_map(|r| r.columns.iter().position(|c| c.name == col_name));
+
+                if let Some(idx) = col_idx {
+                    Ok(rows
+                        .iter()
+                        .filter_map(|r| {
+                            if idx < r.values.len() {
+                                Some(&r.values[idx])
+                            } else {
+                                None
+                            }
+                        })
+                        .min_by(|a, b| match (a, b) {
+                            (Value::Integer(a), Value::Integer(b)) => a.cmp(b),
+                            (Value::Float(a), Value::Float(b)) => {
+                                a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
+                            }
+                            (Value::String(a), Value::String(b)) => a.cmp(b),
+                            _ => std::cmp::Ordering::Equal,
+                        })
+                        .cloned()
+                        .unwrap_or(Value::Null))
+                } else {
+                    Ok(Value::Null)
+                }
+            }
+            AggregateFunction::Max => {
+                let col_idx = rows
+                    .iter()
+                    .find_map(|r| r.columns.iter().position(|c| c.name == col_name));
+
+                if let Some(idx) = col_idx {
+                    Ok(rows
+                        .iter()
+                        .filter_map(|r| {
+                            if idx < r.values.len() {
+                                Some(&r.values[idx])
+                            } else {
+                                None
+                            }
+                        })
+                        .max_by(|a, b| match (a, b) {
+                            (Value::Integer(a), Value::Integer(b)) => a.cmp(b),
+                            (Value::Float(a), Value::Float(b)) => {
+                                a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
+                            }
+                            (Value::String(a), Value::String(b)) => a.cmp(b),
+                            _ => std::cmp::Ordering::Equal,
+                        })
+                        .cloned()
+                        .unwrap_or(Value::Null))
+                } else {
+                    Ok(Value::Null)
+                }
+            }
+        }
+    }
+
     fn execute_aggregate(
         &mut self,
         input: &PhysicalOperator,
@@ -647,74 +945,7 @@ impl Executor {
                     _ => continue,
                 };
 
-                let value = match function {
-                    AggregateFunction::Count => Value::Integer(rows.len() as i64),
-                    AggregateFunction::Sum => {
-                        let col_idx = rows[0].columns.iter().position(|c| c.name == col_name);
-                        if let Some(idx) = col_idx {
-                            let sum: i64 = rows
-                                .iter()
-                                .filter_map(|r| match &r.values[idx] {
-                                    Value::Integer(i) => Some(i),
-                                    _ => None,
-                                })
-                                .sum();
-                            Value::Integer(sum)
-                        } else {
-                            Value::Null
-                        }
-                    }
-                    AggregateFunction::Avg => {
-                        let col_idx = rows[0].columns.iter().position(|c| c.name == col_name);
-                        if let Some(idx) = col_idx {
-                            let values: Vec<i64> = rows
-                                .iter()
-                                .filter_map(|r| match &r.values[idx] {
-                                    Value::Integer(i) => Some(*i),
-                                    _ => None,
-                                })
-                                .collect();
-                            if !values.is_empty() {
-                                let sum: i64 = values.iter().sum();
-                                Value::Float(sum as f64 / values.len() as f64)
-                            } else {
-                                Value::Null
-                            }
-                        } else {
-                            Value::Null
-                        }
-                    }
-                    AggregateFunction::Min => {
-                        let col_idx = rows[0].columns.iter().position(|c| c.name == col_name);
-                        if let Some(idx) = col_idx {
-                            rows.iter()
-                                .map(|r| &r.values[idx])
-                                .min_by(|a, b| match (a, b) {
-                                    (Value::Integer(a), Value::Integer(b)) => a.cmp(b),
-                                    _ => std::cmp::Ordering::Equal,
-                                })
-                                .cloned()
-                                .unwrap_or(Value::Null)
-                        } else {
-                            Value::Null
-                        }
-                    }
-                    AggregateFunction::Max => {
-                        let col_idx = rows[0].columns.iter().position(|c| c.name == col_name);
-                        if let Some(idx) = col_idx {
-                            rows.iter()
-                                .map(|r| &r.values[idx])
-                                .max_by(|a, b| match (a, b) {
-                                    (Value::Integer(a), Value::Integer(b)) => a.cmp(b),
-                                    _ => std::cmp::Ordering::Equal,
-                                })
-                                .cloned()
-                                .unwrap_or(Value::Null)
-                        } else {
-                            Value::Null
-                        }
-                    }
-                };
+                let value = self.compute_aggregate(function, col_name, &rows)?;
 
                 let display_name = alias
                     .as_ref()

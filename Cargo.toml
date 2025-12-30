@@ -10,14 +10,14 @@ members = [
 exclude = ["fuzz"]
 
 [workspace.package]
-version = "0.6.0"
+version = "0.7.0"
 edition = "2021"
 authors = ["Srikanth Aakuthota <virtumemailabs@gmail.com>"]
 license = "Apache-2.0"
 repository = "https://github.com/VIRTUMEM-AI-LABS/rustlite"
 homepage = "https://rustlite.dev"
 documentation = "https://docs.rs/rustlite"
-rust-version = "1.70.0"
+rust-version = "1.81.0"
 
 [workspace.metadata.docs.rs]
 all-features = true

@@ -13,7 +13,7 @@ keywords = ["database", "wal", "logging", "internal"]
 categories = ["database"]
 
 [dependencies]
-rustlite-core = { path = "../rustlite-core", version = "0.6.0" }
+rustlite-core = { path = "../rustlite-core", version = "0.7.0" }
 crc32fast.workspace = true
 bincode.workspace = true
 serde.workspace = true

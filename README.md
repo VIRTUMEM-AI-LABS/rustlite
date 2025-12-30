@@ -10,7 +10,7 @@
 [![Documentation](https://docs.rs/rustlite/badge.svg)](https://docs.rs/rustlite)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 [![Build Status](https://github.com/VIRTUMEM-AI-LABS/rustlite/workflows/CI/badge.svg)](https://github.com/VIRTUMEM-AI-LABS/rustlite/actions)
-[![Changelog](https://img.shields.io/badge/Changelog-docs/CHANGELOG.md-blue.svg)](docs/CHANGELOG.md)
+[![Changelog](https://img.shields.io/badge/Changelog-docs/CHANGELOG.md-blue.svg)](https://github.com/VIRTUMEM-AI-LABS/rustlite/blob/main/docs/CHANGELOG.md)
 
 </p>
 
@@ -50,7 +50,7 @@ RustLite excels in scenarios where you need fast, transactional key-value storag
 
 ## ✨ Features
 
-### Current (v0.6.0-dev)
+### Current (v0.7.0)
 - ✅ **Persistent storage** with LSM-tree architecture
 - ✅ **Write-Ahead Logging (WAL)** for crash recovery
 - ✅ **SSTable compaction** for optimized disk usage
@@ -58,6 +58,8 @@ RustLite excels in scenarios where you need fast, transactional key-value storag
 - ✅ **B-Tree indexing** for range queries and ordered lookups
 - ✅ **Hash indexing** for O(1) exact-match lookups
 - ✅ **SQL-like query engine** with SELECT, WHERE, LIMIT support
+- ✅ **Aggregate functions**: COUNT(*), COUNT(column), SUM, AVG, MIN, MAX
+- ✅ **GROUP BY** with multiple columns and HAVING clauses
 - ✅ **Full MVCC transactions** with snapshot isolation
 - ✅ **JOIN operations** (INNER, LEFT, RIGHT, FULL OUTER)
 - ✅ **Hash join** and **nested loop join** algorithms
@@ -66,10 +68,10 @@ RustLite excels in scenarios where you need fast, transactional key-value storag
 - ✅ Simple, ergonomic API
 
 ### Roadmap
-- 🔄 **v0.6**: Advanced query optimization and joins
+- 🔄 **v0.8**: Additional SQL features and optimizations
 - 🔄 **v1.0**: Production-ready with full ACID guarantees
 
-See [docs/ROADMAP.md](docs/ROADMAP.md) for detailed plans.
+See [docs/ROADMAP.md](https://github.com/VIRTUMEM-AI-LABS/rustlite/blob/main/docs/ROADMAP.md) for detailed plans.
 
 ## 🚀 Quick Start
 
@@ -118,7 +120,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 - `RepeatableRead`: Snapshot isolation (default)
 - `Serializable`: Strictest consistency
 
-See [examples/transaction_demo.rs](crates/rustlite-api/examples/transaction_demo.rs) for comprehensive examples.
+See [examples/transaction_demo.rs](https://github.com/VIRTUMEM-AI-LABS/rustlite/blob/main/crates/rustlite-api/examples/transaction_demo.rs) for comprehensive examples.
 
 ### Persistent Database (Recommended)
 
@@ -196,7 +198,7 @@ println!("Found user: {}", user_ids[0]); // Output: 1
 
 ### Relational Data with Foreign Keys
 
-See [examples/relational_demo.rs](crates/rustlite-api/examples/relational_demo.rs) for a complete example showing:
+See [examples/relational_demo.rs](https://github.com/VIRTUMEM-AI-LABS/rustlite/blob/main/crates/rustlite-api/examples/relational_demo.rs) for a complete example showing:
 - Users and Orders tables
 - Foreign key relationships
 - Primary and secondary indexes
@@ -251,7 +253,7 @@ RustLite is built with a modular LSM-tree architecture:
 - **Compaction**: Background merging to reduce read amplification
 - **Snapshot**: Point-in-time backups for disaster recovery
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for technical details and [docs/README.md](docs/README.md) for the full documentation index.
+See [docs/ARCHITECTURE.md](https://github.com/VIRTUMEM-AI-LABS/rustlite/blob/main/docs/ARCHITECTURE.md) for technical details and [docs/README.md](https://github.com/VIRTUMEM-AI-LABS/rustlite/blob/main/docs/README.md) for the full documentation index.
 
 ## 📝 Production Logging (v0.6+)
 
@@ -275,11 +277,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-See [docs/LOGGING.md](docs/LOGGING.md) for comprehensive logging guide.
+See [docs/LOGGING.md](https://github.com/VIRTUMEM-AI-LABS/rustlite/blob/main/docs/LOGGING.md) for comprehensive logging guide.
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [CONTRIBUTING.md](docs/CONTRIBUTING.md) for guidelines.
+We welcome contributions! Please see our [CONTRIBUTING.md](https://github.com/VIRTUMEM-AI-LABS/rustlite/blob/main/docs/CONTRIBUTING.md) for guidelines.
 
 Key areas where we need help:
 - Query optimizer and query planner
@@ -290,13 +292,13 @@ Key areas where we need help:
 
 ## 📋 Requirements
 
-- Rust 1.70.0 or later
+- Rust 1.81.0 or later
 - Supported platforms: Linux, macOS, Windows
 
 ## 🧪 Testing
 
 ```bash
-# Run all tests (126+ tests)
+# Run all tests (48 tests: 39 lib + 9 aggregate)
 cargo test --workspace
 
 # Run with logging
@@ -305,6 +307,7 @@ RUST_LOG=debug cargo test
 # Run examples
 cargo run --example persistent_demo
 cargo run --example relational_demo
+cargo run --example aggregate_demo     # NEW: GROUP BY and aggregates
 
 # Run benchmarks
 cargo bench
@@ -324,7 +327,7 @@ RustLite takes security seriously. Please report any security vulnerabilities to
 
 ## 📜 License
 
-This project is licensed under the Apache License, Version 2.0 ([LICENSE](LICENSE) or http://www.apache.org/licenses/LICENSE-2.0).
+This project is licensed under the Apache License, Version 2.0 ([LICENSE](https://github.com/VIRTUMEM-AI-LABS/rustlite/blob/main/LICENSE) or http://www.apache.org/licenses/LICENSE-2.0).
 
 ### Contribution
 

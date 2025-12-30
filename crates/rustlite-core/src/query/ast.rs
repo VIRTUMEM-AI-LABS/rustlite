@@ -9,6 +9,8 @@ pub struct Query {
     pub select: SelectClause,
     pub from: FromClause,
     pub where_clause: Option<WhereClause>,
+    pub group_by: Option<GroupByClause>,
+    pub having: Option<HavingClause>,
     pub order_by: Option<OrderByClause>,
     pub limit: Option<LimitClause>,
 }
@@ -71,6 +73,18 @@ pub enum JoinType {
 /// WHERE clause for filtering
 #[derive(Debug, Clone, PartialEq)]
 pub struct WhereClause {
+    pub condition: Expression,
+}
+
+/// GROUP BY clause for aggregation
+#[derive(Debug, Clone, PartialEq)]
+pub struct GroupByClause {
+    pub columns: Vec<String>,
+}
+
+/// HAVING clause for filtering grouped results
+#[derive(Debug, Clone, PartialEq)]
+pub struct HavingClause {
     pub condition: Expression,
 }
 
@@ -176,6 +190,12 @@ impl fmt::Display for Query {
         if let Some(ref where_clause) = self.where_clause {
             write!(f, " {}", where_clause)?;
         }
+        if let Some(ref group_by) = self.group_by {
+            write!(f, " {}", group_by)?;
+        }
+        if let Some(ref having) = self.having {
+            write!(f, " {}", having)?;
+        }
         if let Some(ref order_by) = self.order_by {
             write!(f, " {}", order_by)?;
         }
@@ -271,6 +291,25 @@ impl fmt::Display for JoinType {
 impl fmt::Display for WhereClause {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "WHERE {}", self.condition)
+    }
+}
+
+impl fmt::Display for GroupByClause {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "GROUP BY ")?;
+        for (i, col) in self.columns.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}", col)?;
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Display for HavingClause {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "HAVING {}", self.condition)
     }
 }
 

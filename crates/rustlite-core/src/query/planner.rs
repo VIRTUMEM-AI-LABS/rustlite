@@ -56,7 +56,14 @@ pub enum PhysicalOperator {
         join_type: JoinType,
         condition: Expression,
     },
-    /// Aggregation (COUNT, SUM, AVG, MIN, MAX)
+    /// GROUP BY with optional aggregation
+    GroupBy {
+        input: Box<PhysicalOperator>,
+        group_columns: Vec<String>,
+        aggregates: Vec<SelectColumn>,
+        having: Option<Expression>,
+    },
+    /// Aggregation (COUNT, SUM, AVG, MIN, MAX) without grouping
     Aggregate {
         input: Box<PhysicalOperator>,
         aggregates: Vec<SelectColumn>,
@@ -102,22 +109,41 @@ impl Planner {
             plan = self.apply_filter(plan, &where_clause.condition)?;
         }
 
-        // Apply projection (SELECT columns)
-        plan = PhysicalOperator::Project {
-            input: Box::new(plan),
-            columns: query.select.columns.clone(),
-        };
-
-        // Apply aggregation if needed
+        // Check if we have aggregates or GROUP BY
         let has_aggregates = query
             .select
             .columns
             .iter()
             .any(|col| matches!(col, SelectColumn::Aggregate { .. }));
-        if has_aggregates {
+
+        // Apply GROUP BY and aggregation if needed
+        if let Some(ref group_by) = query.group_by {
+            // For GROUP BY, we need:
+            // 1. All columns used in GROUP BY
+            // 2. All columns referenced in aggregate functions
+            // We'll just pass through all columns (TableScan) and let GroupBy handle it
+
+            // Apply GROUP BY with aggregates
+            plan = PhysicalOperator::GroupBy {
+                input: Box::new(plan),
+                group_columns: group_by.columns.clone(),
+                aggregates: query.select.columns.clone(),
+                having: query.having.as_ref().map(|h| h.condition.clone()),
+            };
+        } else if has_aggregates {
+            // For aggregation without GROUP BY, we also need all referenced columns
+            // Pass through TableScan directly
+
+            // Aggregation without GROUP BY
             plan = PhysicalOperator::Aggregate {
                 input: Box::new(plan),
                 aggregates: query.select.columns.clone(),
+            };
+        } else {
+            // No aggregates - normal projection
+            plan = PhysicalOperator::Project {
+                input: Box::new(plan),
+                columns: query.select.columns.clone(),
             };
         }
 
@@ -360,6 +386,33 @@ impl fmt::Display for PhysicalOperator {
                 ..
             } => {
                 write!(f, "{}Join({} x {})", join_type, left, right)
+            }
+            PhysicalOperator::GroupBy {
+                input,
+                group_columns,
+                aggregates,
+                having,
+            } => {
+                write!(f, "GroupBy(")?;
+                for (i, col) in group_columns.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", col)?;
+                }
+                if !aggregates.is_empty() {
+                    write!(f, " | ")?;
+                    for (i, agg) in aggregates.iter().enumerate() {
+                        if i > 0 {
+                            write!(f, ", ")?;
+                        }
+                        write!(f, "{}", agg)?;
+                    }
+                }
+                if let Some(h) = having {
+                    write!(f, " HAVING {}", h)?;
+                }
+                write!(f, ") -> {}", input)
             }
             PhysicalOperator::Aggregate { input, aggregates } => {
                 write!(f, "Aggregate(")?;
