@@ -6,10 +6,12 @@
 // 3. CRC validation - verifying data integrity of each record
 
 use crate::record::WalRecord;
+use crate::writer::WalHeader;
 use rustlite_core::{Error, Result};
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
+use tracing::debug;
 
 /// WAL reader for reading records from log segments
 pub struct WalReader {
@@ -72,9 +74,33 @@ impl WalReader {
         let file = File::open(path)
             .map_err(|e| Error::Storage(format!("Failed to open segment {:?}: {}", path, e)))?;
 
-        self.reader = Some(BufReader::new(file));
+        let mut reader = BufReader::new(file);
+
+        // Try to read header (v1.0+)
+        // If header is missing or invalid, assume legacy format (v0.x)
+        let header_offset = match WalHeader::read_from(&mut reader) {
+            Ok(header) => {
+                debug!(
+                    segment = ?path,
+                    version = header.version,
+                    "Opened WAL segment with header"
+                );
+                WalHeader::SIZE as u64
+            }
+            Err(_) => {
+                // No valid header, must be legacy format - reopen to reset position
+                let file = File::open(path).map_err(|e| {
+                    Error::Storage(format!("Failed to reopen segment {:?}: {}", path, e))
+                })?;
+                reader = BufReader::new(file);
+                debug!(segment = ?path, "Opened legacy WAL segment (pre-v1.0)");
+                0
+            }
+        };
+
+        self.reader = Some(reader);
         self.current_segment_index = index;
-        self.current_offset = 0;
+        self.current_offset = header_offset;
 
         Ok(())
     }

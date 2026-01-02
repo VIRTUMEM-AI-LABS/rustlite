@@ -3,10 +3,70 @@ use crate::record::WalRecord;
 use crate::SyncMode;
 use rustlite_core::{Error, Result};
 use std::fs::{File, OpenOptions};
-use std::io::{BufWriter, Write};
+use std::io::{BufWriter, Read, Write};
 use std::path::PathBuf;
 use tracing::{debug, info, instrument};
 
+/// Magic bytes for WAL segment files ("RLWL" = RustLite WAL)
+const WAL_MAGIC_HEADER: [u8; 4] = *b"RLWL";
+
+/// WAL format version (v1.0.0+)
+const WAL_FORMAT_VERSION: u16 = 1;
+
+/// File header written at the start of WAL segment files (v1.0+)
+#[derive(Debug, Clone)]
+pub struct WalHeader {
+    /// Magic bytes: "RLWL"
+    pub magic: [u8; 4],
+    /// Format version
+    pub version: u16,
+}
+
+impl WalHeader {
+    /// Size of header in bytes
+    pub const SIZE: usize = 6; // 4 bytes magic + 2 bytes version
+
+    /// Create a new header with current version
+    pub fn new() -> Self {
+        Self {
+            magic: WAL_MAGIC_HEADER,
+            version: WAL_FORMAT_VERSION,
+        }
+    }
+
+    /// Write header to a writer
+    pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<()> {
+        writer.write_all(&self.magic)?;
+        writer.write_all(&self.version.to_le_bytes())?;
+        Ok(())
+    }
+
+    /// Read header from a reader
+    pub fn read_from<R: Read>(reader: &mut R) -> Result<Self> {
+        let mut magic = [0u8; 4];
+        reader.read_exact(&mut magic)?;
+
+        if magic != WAL_MAGIC_HEADER {
+            return Err(Error::Corruption(format!(
+                "Invalid WAL magic: expected {:?}, got {:?}",
+                WAL_MAGIC_HEADER, magic
+            )));
+        }
+
+        let mut version_bytes = [0u8; 2];
+        reader.read_exact(&mut version_bytes)?;
+        let version = u16::from_le_bytes(version_bytes);
+
+        if version > WAL_FORMAT_VERSION {
+            return Err(Error::Corruption(format!(
+                "Unsupported WAL version: {} (current: {})",
+                version, WAL_FORMAT_VERSION
+            )));
+        }
+
+        Ok(Self { magic, version })
+    }
+}
 pub struct WalWriter {
     file: BufWriter<File>,
     current_segment: PathBuf,
@@ -34,8 +94,9 @@ impl WalWriter {
         let segment_path = wal_dir.join(&segment_name);
 
         // Open file for appending
-        let file = OpenOptions::new()
+        let mut file = OpenOptions::new()
             .create(true)
+            .read(true)
             .append(true)
             .open(&segment_path)
             .map_err(|e| Error::Storage(format!("Failed to open WAL segment: {}", e)))?;
@@ -43,10 +104,21 @@ impl WalWriter {
         // Get current file size for rotation tracking
         let current_size = file.metadata().map(|m| m.len()).unwrap_or(0);
 
+        // Write header if this is a new file (v1.0+)
+        if current_size == 0 {
+            let header = WalHeader::new();
+            header.write_to(&mut file)?;
+            file.flush()?;
+            debug!("Wrote WAL header to new segment");
+        }
+
+        // Get actual size after potentially writing header
+        let actual_size = file.metadata().map(|m| m.len()).unwrap_or(0);
+
         Ok(Self {
             file: BufWriter::new(file),
             current_segment: segment_path,
-            current_size,
+            current_size: actual_size,
             max_segment_size,
             sync_mode,
             sequence: starting_sequence,
@@ -125,21 +197,32 @@ impl WalWriter {
         // Sync current segment before rotating
         self.sync()?;
 
+        // Increment sequence for new segment
+        self.sequence += 1;
+
         // Generate new segment filename
-        let segment_name = format!("wal-{:016x}.log", self.sequence + 1);
+        let segment_name = format!("wal-{:016x}.log", self.sequence);
         let new_segment = self.wal_dir.join(&segment_name);
 
         // Open new segment
-        let file = OpenOptions::new()
+        let mut file = OpenOptions::new()
             .create(true)
             .append(true)
             .open(&new_segment)
             .map_err(|e| Error::Storage(format!("Failed to create new segment: {}", e)))?;
 
+        // Write header for new segment (v1.0+)
+        let header = WalHeader::new();
+        header.write_to(&mut file)?;
+        file.flush()?;
+        let header_size = WalHeader::SIZE as u64;
+
+        debug!(segment = ?new_segment, "Rotated to new WAL segment");
+
         // Update state
         self.file = BufWriter::new(file);
         self.current_segment = new_segment;
-        self.current_size = 0;
+        self.current_size = header_size;
 
         Ok(())
     }

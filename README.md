@@ -67,12 +67,6 @@ RustLite excels in scenarios where you need fast, transactional key-value storag
 - ✅ Thread-safe concurrent access
 - ✅ Simple, ergonomic API
 
-### Roadmap
-- 🔄 **v0.8**: Additional SQL features and optimizations
-- 🔄 **v1.0**: Production-ready with full ACID guarantees
-
-See [docs/ROADMAP.md](https://github.com/VIRTUMEM-AI-LABS/rustlite/blob/main/docs/ROADMAP.md) for detailed plans.
-
 ## 🚀 Quick Start
 
 Add RustLite to your `Cargo.toml`:

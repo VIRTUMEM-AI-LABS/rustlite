@@ -22,7 +22,10 @@ use std::fs::{self, File};
 use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
-/// Magic number for SSTable files ("SSTBLIT" in ASCII-ish)
+/// Magic number for SSTable files ("RSSL" = RustLite SSTable)
+const SSTABLE_MAGIC_HEADER: [u8; 4] = *b"RSSL";
+
+/// Footer magic for backward compatibility
 const SSTABLE_MAGIC: u64 = 0x53_53_54_42_4C_49_54;
 
 /// SSTable format version (v1.0.0+)
@@ -98,10 +101,65 @@ pub struct SSTableFooter {
     pub min_key: Vec<u8>,
     /// Maximum key in the SSTable
     pub max_key: Vec<u8>,
-    /// Magic number for validation
+    /// Magic number for validation (kept for backward compat with footer)
     pub magic: u64,
     /// CRC32 of the footer data
     pub crc: u32,
+}
+
+/// File header written at the start of SSTable files (v1.0+)
+#[derive(Debug, Clone)]
+pub struct SSTableHeader {
+    /// Magic bytes: "RSSL"
+    pub magic: [u8; 4],
+    /// Format version
+    pub version: u16,
+}
+
+impl SSTableHeader {
+    /// Size of header in bytes
+    pub const SIZE: usize = 6; // 4 bytes magic + 2 bytes version
+
+    /// Create a new header with current version
+    pub fn new() -> Self {
+        Self {
+            magic: SSTABLE_MAGIC_HEADER,
+            version: SSTABLE_FORMAT_VERSION,
+        }
+    }
+
+    /// Write header to a writer
+    pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<()> {
+        writer.write_all(&self.magic)?;
+        writer.write_all(&self.version.to_le_bytes())?;
+        Ok(())
+    }
+
+    /// Read header from a reader
+    pub fn read_from<R: Read>(reader: &mut R) -> Result<Self> {
+        let mut magic = [0u8; 4];
+        reader.read_exact(&mut magic)?;
+
+        if magic != SSTABLE_MAGIC_HEADER {
+            return Err(Error::Corruption(format!(
+                "Invalid SSTable magic: expected {:?}, got {:?}",
+                SSTABLE_MAGIC_HEADER, magic
+            )));
+        }
+
+        let mut version_bytes = [0u8; 2];
+        reader.read_exact(&mut version_bytes)?;
+        let version = u16::from_le_bytes(version_bytes);
+
+        if version > SSTABLE_FORMAT_VERSION {
+            return Err(Error::Corruption(format!(
+                "Unsupported SSTable version: {} (current: {})",
+                version, SSTABLE_FORMAT_VERSION
+            )));
+        }
+
+        Ok(Self { magic, version })
+    }
 }
 
 /// SSTable metadata (in-memory representation)
@@ -157,11 +215,17 @@ impl SSTableWriter {
     pub fn with_block_size(path: impl AsRef<Path>, block_size: usize) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
         let file = File::create(&path)?;
+        let mut writer = BufWriter::new(file);
+
+        // Write file header (v1.0+)
+        let header = SSTableHeader::new();
+        header.write_to(&mut writer)?;
+        let header_size = SSTableHeader::SIZE as u64;
 
         Ok(Self {
             path,
-            writer: BufWriter::new(file),
-            position: 0,
+            writer,
+            position: header_size,
             index: Vec::new(),
             block_buffer: Vec::with_capacity(block_size),
             block_size,
@@ -327,6 +391,8 @@ pub struct SSTableReader {
     footer: SSTableFooter,
     /// File size
     file_size: u64,
+    /// Header offset (0 for legacy files, SSTableHeader::SIZE for v1.0+)
+    header_offset: u64,
 }
 
 impl SSTableReader {
@@ -341,6 +407,27 @@ impl SSTableReader {
         if file_size < 4 {
             return Err(Error::Corruption("SSTable too small".into()));
         }
+
+        // Try to read header (v1.0+)
+        // If header is missing or invalid, assume legacy format (v0.x)
+        let header_offset = if file_size >= SSTableHeader::SIZE as u64 {
+            file.seek(SeekFrom::Start(0))?;
+            match SSTableHeader::read_from(&mut file) {
+                Ok(header) => {
+                    // Valid header found, data starts after header
+                    tracing::debug!("Opened SSTable with format version {}", header.version);
+                    SSTableHeader::SIZE as u64
+                }
+                Err(_) => {
+                    // No valid header, assume legacy format
+                    tracing::debug!("Opened legacy SSTable (pre-v1.0)");
+                    0
+                }
+            }
+        } else {
+            // File too small for header, must be legacy
+            0
+        };
 
         // Read footer length (last 4 bytes)
         file.seek(SeekFrom::End(-4))?;
@@ -362,15 +449,22 @@ impl SSTableReader {
         }
 
         // Validate format version (v1.0.0+)
-        if footer.format_version != SSTABLE_FORMAT_VERSION {
+        if footer.format_version > SSTABLE_FORMAT_VERSION {
             return Err(Error::Corruption(format!(
-                "Unsupported SSTable format version: {} (expected {})",
+                "Unsupported SSTable format version: {} (current: {})",
                 footer.format_version, SSTABLE_FORMAT_VERSION
             )));
         }
 
-        // Read index
-        file.seek(SeekFrom::Start(footer.index_offset))?;
+        // Read index (index_offset is already absolute from file start for v1.0+, or from data start for legacy)
+        let index_offset = if header_offset > 0 {
+            // New format: footer.index_offset is absolute including header
+            footer.index_offset
+        } else {
+            // Legacy format: footer.index_offset is relative to start of data (which is position 0)
+            footer.index_offset
+        };
+        file.seek(SeekFrom::Start(index_offset))?;
         let mut index_buf = vec![0u8; footer.index_size as usize];
         file.read_exact(&mut index_buf)?;
 
@@ -383,6 +477,7 @@ impl SSTableReader {
             index,
             footer,
             file_size,
+            header_offset,
         })
     }
 
@@ -427,7 +522,14 @@ impl SSTableReader {
     fn read_block(&mut self, block_idx: usize) -> Result<Vec<SSTableEntry>> {
         let index_entry = &self.index[block_idx];
 
-        self.file.seek(SeekFrom::Start(index_entry.offset))?;
+        // Block offsets are already absolute for v1.0+ files (include header)
+        // For legacy files, they start at position 0 (no header)
+        let absolute_offset = if self.header_offset > 0 {
+            index_entry.offset // Already absolute
+        } else {
+            index_entry.offset // Relative to start (no header)
+        };
+        self.file.seek(SeekFrom::Start(absolute_offset))?;
 
         let data_size = index_entry.size as usize - 4; // Subtract CRC size
         let mut data_buf = vec![0u8; data_size];

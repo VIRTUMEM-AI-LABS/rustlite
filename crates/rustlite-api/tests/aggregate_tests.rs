@@ -458,11 +458,13 @@ fn test_having_clause() {
 #[test]
 fn test_count_with_nulls() {
     let db = Database::in_memory().unwrap();
-    
+
     // Test COUNT(*) vs COUNT(column) with NULL values
     let plan_star = db.prepare("SELECT COUNT(*) AS total FROM data").unwrap();
-    let plan_column = db.prepare("SELECT COUNT(value) AS non_null FROM data").unwrap();
-    
+    let plan_column = db
+        .prepare("SELECT COUNT(value) AS non_null FROM data")
+        .unwrap();
+
     let mut context = ExecutionContext::new();
     context.data.insert(
         "data".to_string(),
@@ -497,12 +499,12 @@ fn test_count_with_nulls() {
             },
         ],
     );
-    
+
     // COUNT(*) should count all rows including NULLs
     let results_star = db.execute_plan(&plan_star, context.clone()).unwrap();
     assert_eq!(results_star.len(), 1);
     assert_eq!(results_star[0].values[0], Value::Integer(4)); // All 4 rows
-    
+
     // COUNT(value) should count only non-NULL values
     let results_column = db.execute_plan(&plan_column, context).unwrap();
     assert_eq!(results_column.len(), 1);
